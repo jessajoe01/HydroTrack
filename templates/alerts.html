@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerts — Smart Water Guardian</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">💧 <span>Smart</span> Water Guardian</a>
+  <ul class="navbar-nav">
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/tanker-log">Log Tanker</a></li>
+    <li><a href="/alerts">Alerts</a></li>
+    <li><a href="/cost">Cost</a></li>
+    <li><a href="/supplier">Suppliers</a></li>
+    <li><a href="/special-request">Special Request</a></li>
+    <li><a href="#" onclick="logout()" style="color:#ff8080;">Logout</a></li>
+  </ul>
+</nav>
+
+<div class="page-wrapper">
+
+  <h1 class="page-title">🔔 Alerts</h1>
+
+  <!-- Summary cards -->
+  <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+    <div class="stat-card">
+      <div class="stat-value" id="totalAlerts">—</div>
+      <div class="stat-label">Total Alerts</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-value warning" id="checkinAlerts">—</div>
+      <div class="stat-label">Weekly Check-ins</div>
+    </div>
+    <div class="stat-card critical">
+      <div class="stat-value critical" id="refillAlerts">—</div>
+      <div class="stat-label">Refill Requests</div>
+    </div>
+  </div>
+
+  <!-- Active weekly check-in banner -->
+  <div id="activeCheckin" style="display:none;">
+    <div class="alert-banner warning">
+      <span class="alert-icon">🔔</span>
+      <div style="flex:1;">
+        <strong>Weekly Check-in Pending</strong>
+        <p id="activeCheckinMsg" style="margin-top:0.2rem;"></p>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-shrink:0;">
+        <button class="btn btn-success" onclick="respondAlert(false)">
+          ✅ Still have water
+        </button>
+        <button class="btn btn-danger" onclick="respondAlert(true)">
+          🚨 Need refill
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- No alerts state -->
+  <div id="noAlerts" class="card" style="display:none;text-align:center;padding:3rem;">
+    <div style="font-size:3rem;">✅</div>
+    <h3 style="color:var(--success);margin:0.5rem 0;">All Clear!</h3>
+    <p class="text-muted">No alerts at the moment. Your water supply is being monitored.</p>
+  </div>
+
+  <!-- Alerts table -->
+  <div class="card" id="alertsCard" style="display:none;">
+    <div class="card-title">Alert History</div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date &amp; Time</th>
+            <th>Type</th>
+            <th>Message</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="alertsBody">
+          <tr>
+            <td colspan="4" class="text-center text-muted" style="padding:2rem;">
+              Loading...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+
+let activeCheckinId = null;
+
+// ── Alert type display config ─────────────────────────────
+const alertConfig = {
+  weekly_checkin: { label: 'Weekly Check-in', badge: 'badge-warning', icon: '🔔' },
+  refill_needed:  { label: 'Refill Needed',   badge: 'badge-danger',  icon: '🚨' },
+  '4_day':        { label: '4 Day Warning',   badge: 'badge-warning', icon: '⚠️' },
+  '3_day':        { label: '3 Day Warning',   badge: 'badge-warning', icon: '⚠️' },
+  '2_day':        { label: 'Critical',        badge: 'badge-danger',  icon: '🚨' },
+};
+
+// ✅ FIXED: removed the stray plain-text line that was breaking JS parsing
+// ── Load alerts ───────────────────────────────────────────
+async function loadAlerts() {
+  const alerts = await get('/api/alerts');
+  const body   = document.getElementById('alertsBody');
+
+  // Summary counts
+  document.getElementById('totalAlerts').textContent =
+    alerts.length;
+  document.getElementById('checkinAlerts').textContent =
+    alerts.filter(a => a.alert_type === 'weekly_checkin').length;
+  document.getElementById('refillAlerts').textContent =
+    alerts.filter(a => a.alert_type === 'refill_needed').length;
+
+  if (!alerts.length) {
+    document.getElementById('noAlerts').style.display   = 'block';
+    document.getElementById('alertsCard').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('noAlerts').style.display   = 'none';
+  document.getElementById('alertsCard').style.display = 'block';
+
+  // Show weekly check-in banner if there is an unread one
+  const unreadCheckin = alerts.find(
+    a => a.alert_type === 'weekly_checkin' && !a.is_read
+  );
+
+  if (unreadCheckin) {
+    activeCheckinId = unreadCheckin.id;
+    document.getElementById('activeCheckinMsg').textContent = unreadCheckin.message;
+    document.getElementById('activeCheckin').style.display  = 'block';
+  } else {
+    document.getElementById('activeCheckin').style.display  = 'none';
+  }
+
+  // Build table rows
+  body.innerHTML = alerts.map(alert => {
+    const cfg = alertConfig[alert.alert_type] ||
+      { label: alert.alert_type, badge: 'badge-info', icon: '📢' };
+
+    return `
+      <tr>
+        <td style="white-space:nowrap;">${formatDateTime(alert.created_on)}</td>
+        <td><span class="badge ${cfg.badge}">${cfg.icon} ${cfg.label}</span></td>
+        <td>${alert.message}</td>
+        <td>
+          ${alert.is_read
+            ? '<span class="badge badge-gray">Read</span>'
+            : '<span class="badge badge-warning">Unread</span>'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ── Respond to weekly check-in ────────────────────────────
+async function respondAlert(needsWater) {
+  if (!activeCheckinId) return;
+
+  await post(`/api/alerts/${activeCheckinId}/respond`, {
+    needs_water: needsWater
+  });
+
+  document.getElementById('activeCheckin').style.display = 'none';
+
+  showToast(
+    needsWater ? 'Refill alert created. Please visit suppliers.' : 'Got it! We will check again next week.',
+    needsWater ? 'warning' : 'success'
+  );
+
+  loadAlerts();
+}
+
+// ── Format date/time ──────────────────────────────────────
+function formatDateTime(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleString('en-IN', {
+    day:    'numeric',
+    month:  'short',
+    year:   'numeric',
+    hour:   '2-digit',
+    minute: '2-digit'
+  });
+}
+
+// ── Logout ────────────────────────────────────────────────
+async function logout() {
+  await post('/logout');
+  localStorage.removeItem('swg_user');
+  window.location.href = '/login';
+}
+
+// ── Init ──────────────────────────────────────────────────
+async function init() {
+  const user = await requireLogin();
+  if (!user) return;
+
+  await post('/api/alerts/check'); // auto-trigger weekly check
+  loadAlerts();
+}
+
+init();
+
+</script>
+
+</body>
+</html>

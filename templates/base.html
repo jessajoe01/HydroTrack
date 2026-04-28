@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Smart Water Guardian{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">
+    💧 <span>Smart</span> Water Guardian
+  </a>
+  <ul class="navbar-nav">
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/tanker-log">Log Tanker</a></li>
+    <li><a href="/alerts">Alerts</a></li>
+    <li><a href="/cost">Cost</a></li>
+    <li><a href="/supplier">Suppliers</a></li>
+    <li><a href="/special-request">Special Request</a></li>
+    <li>
+      <a href="#" onclick="logout()" style="color: #ff8080;">Logout</a>
+    </li>
+  </ul>
+</nav>
+
+{% block content %}{% endblock %}
+
+<script src="/static/script.js"></script>
+<script>
+async function logout() {
+  await post('/logout');
+  window.location.href = '/login';
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

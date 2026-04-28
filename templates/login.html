@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Smart Water Guardian</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="auth-wrapper">
+  <div class="auth-card">
+
+    <div class="auth-logo">
+      <div style="font-size:3rem;">💧</div>
+      <h1>Smart Water Guardian</h1>
+      <p>Sign in to manage your water supply</p>
+    </div>
+
+    <div id="errorMsg" class="alert-banner danger" style="display:none;">
+      <span class="alert-icon">⚠️</span>
+      <span id="errorText"></span>
+    </div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" placeholder="you@example.com" required>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter your password" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg mt-2" id="loginBtn">
+        Sign In
+      </button>
+    </form>
+
+    <p class="text-center text-muted mt-2">
+      Don't have an account?
+      <a href="/register" style="color: var(--primary-mid); font-weight:600;">Register here</a>
+    </p>
+
+  </div>
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+  document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const btn      = document.getElementById('loginBtn');
+    const errorDiv = document.getElementById('errorMsg');
+    const errorTxt = document.getElementById('errorText');
+
+    btn.textContent = 'Signing in...';
+    btn.disabled    = true;
+    errorDiv.style.display = 'none';
+
+    const data = await post('/login', {
+      email:    document.getElementById('email').value,
+      password: document.getElementById('password').value
+    });
+
+    if (data.status === 'success') {
+      // Save user info to localStorage for navbar use
+      localStorage.setItem('swg_user', JSON.stringify({
+        name:    data.name,
+        user_id: data.user_id
+      }));
+      window.location.href = '/dashboard';
+    } else {
+      errorTxt.textContent   = data.error || 'Login failed. Please try again.';
+      errorDiv.style.display = 'flex';
+      btn.textContent        = 'Sign In';
+      btn.disabled           = false;
+    }
+  });
+</script>
+
+</body>
+</html>

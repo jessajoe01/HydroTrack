@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log Tanker — Smart Water Guardian</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">💧 <span>Smart</span> Water Guardian</a>
+  <ul class="navbar-nav">
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/tanker-log">Log Tanker</a></li>
+    <li><a href="/alerts">Alerts</a></li>
+    <li><a href="/cost">Cost</a></li>
+    <li><a href="/supplier">Suppliers</a></li>
+    <li><a href="/special-request">Special Request</a></li>
+    <li><a href="#" onclick="logout()" style="color:#ff8080;">Logout</a></li>
+  </ul>
+</nav>
+
+<div class="page-wrapper">
+
+  <h1 class="page-title">🚛 Log Tanker Delivery</h1>
+
+  <!-- Log form -->
+  <div class="card">
+    <div class="card-title">New Delivery</div>
+
+    <div id="successMsg" class="alert-banner success" style="display:none;">
+      <span class="alert-icon">✅</span>
+      <span>Delivery logged successfully! Dashboard has been updated.</span>
+    </div>
+
+    <div id="errorMsg" class="alert-banner danger" style="display:none;">
+      <span class="alert-icon">⚠️</span>
+      <span id="errorText"></span>
+    </div>
+
+    <form id="tankerForm">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="deliveryDate">Delivery Date</label>
+          <input type="date" id="deliveryDate" required>
+        </div>
+        <div class="form-group">
+          <label for="litres">Litres Delivered</label>
+          <input type="number" id="litres" placeholder="e.g. 2000"
+                 min="1" step="0.1" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="costPerLitre">Cost per Litre (₹)</label>
+          <input type="number" id="costPerLitre" placeholder="e.g. 0.50"
+                 min="0" step="0.01">
+        </div>
+        <div class="form-group">
+          <label for="supplierName">Supplier Name</label>
+          <input type="text" id="supplierName" placeholder="e.g. City Water Co">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="notes">Notes (optional)</label>
+        <textarea id="notes" rows="2"
+                  placeholder="Any additional notes about this delivery..."></textarea>
+      </div>
+
+      <!-- Live cost preview -->
+      <div id="costPreview" class="alert-banner info" style="display:none;">
+        <span class="alert-icon">💰</span>
+        <span id="costPreviewText"></span>
+      </div>
+
+      <div style="display:flex;gap:1rem;margin-top:1rem;">
+        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+          🚛 Log Delivery
+        </button>
+        <button type="reset" class="btn btn-outline btn-lg" onclick="resetForm()">
+          Clear
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Delivery history -->
+  <div class="card">
+    <div class="card-title">Delivery History</div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Litres</th>
+            <th>Cost / Litre</th>
+            <th>Total Cost</th>
+            <th>Supplier</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr>
+            <td colspan="6" class="text-center text-muted"
+                style="padding:2rem;">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+
+// ── Set today's date as default ───────────────────────────
+document.getElementById('deliveryDate').valueAsDate = new Date();
+
+// ── Live cost preview ─────────────────────────────────────
+function updateCostPreview() {
+  const litres = parseFloat(document.getElementById('litres').value);
+  const cost   = parseFloat(document.getElementById('costPerLitre').value);
+  const preview = document.getElementById('costPreview');
+  const text    = document.getElementById('costPreviewText');
+
+  if (litres > 0 && cost > 0) {
+    const total = (litres * cost).toFixed(2);
+    text.textContent    = `Total cost for this delivery: ₹${total}`;
+    preview.style.display = 'flex';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+document.getElementById('litres').addEventListener('input', updateCostPreview);
+document.getElementById('costPerLitre').addEventListener('input', updateCostPreview);
+
+// ── Submit form ───────────────────────────────────────────
+document.getElementById('tankerForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const btn      = document.getElementById('submitBtn');
+  const errorDiv = document.getElementById('errorMsg');
+  const errorTxt = document.getElementById('errorText');
+  const successDiv = document.getElementById('successMsg');
+
+  errorDiv.style.display   = 'none';
+  successDiv.style.display = 'none';
+  btn.textContent          = 'Saving...';
+  btn.disabled             = true;
+
+  const data = await post('/tanker/log', {
+    delivery_date  : document.getElementById('deliveryDate').value,
+    litres         : parseFloat(document.getElementById('litres').value),
+    cost_per_litre : parseFloat(document.getElementById('costPerLitre').value) || 0,
+    supplier_name  : document.getElementById('supplierName').value,
+    notes          : document.getElementById('notes').value
+  });
+
+  if (data.status === 'success') {
+    successDiv.style.display = 'flex';
+    document.getElementById('tankerForm').reset();
+    document.getElementById('deliveryDate').valueAsDate = new Date();
+    document.getElementById('costPreview').style.display = 'none';
+    loadHistory();
+    showToast('Delivery logged successfully!', 'success');
+  } else {
+    errorTxt.textContent   = data.error || 'Failed to log delivery.';
+    errorDiv.style.display = 'flex';
+  }
+
+  btn.textContent = '🚛 Log Delivery';
+  btn.disabled    = false;
+});
+
+// ── Reset form ────────────────────────────────────────────
+function resetForm() {
+  document.getElementById('costPreview').style.display  = 'none';
+  document.getElementById('successMsg').style.display   = 'none';
+  document.getElementById('errorMsg').style.display     = 'none';
+  document.getElementById('deliveryDate').valueAsDate   = new Date();
+}
+
+// ── Load delivery history ─────────────────────────────────
+async function loadHistory() {
+  const logs = await get('/tanker/history');
+  const body = document.getElementById('historyBody');
+
+  if (!logs.length) {
+    body.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center text-muted" style="padding:2rem;">
+          No deliveries logged yet.
+        </td>
+      </tr>`;
+    return;
+  }
+
+  body.innerHTML = logs.map(log => `
+    <tr>
+      <td>${formatDate(log.delivery_date)}</td>
+      <td><strong>${log.litres} L</strong></td>
+      <td>${log.cost_per_litre ? '₹' + log.cost_per_litre : '—'}</td>
+      <td>${log.total_cost ? '₹' + log.total_cost : '—'}</td>
+      <td>${log.supplier_name || '—'}</td>
+      <td>${log.notes || '—'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Logout ────────────────────────────────────────────────
+async function logout() {
+  await post('/logout');
+  localStorage.removeItem('swg_user');
+  window.location.href = '/login';
+}
+
+// ── Init ──────────────────────────────────────────────────
+async function init() {
+  const user = await requireLogin();
+  if (!user) return;
+  loadHistory();
+}
+
+init();
+</script>
+
+</body>
+</html>

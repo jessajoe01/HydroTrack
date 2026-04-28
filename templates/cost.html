@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cost Summary — Smart Water Guardian</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    /* ── Cost page enhancements ─────────────────────────── */
+    .cost-hero {
+      background: linear-gradient(135deg, var(--primary, #1a6fc4) 0%, #0d4a8a 100%);
+      border-radius: 16px;
+      padding: 2rem 2.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cost-hero::before {
+      content: '💧';
+      position: absolute;
+      right: 2rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 6rem;
+      opacity: 0.08;
+      pointer-events: none;
+    }
+
+    .cost-hero-text h2 {
+      color: #fff;
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin: 0 0 0.3rem;
+    }
+
+    .cost-hero-text p {
+      color: rgba(255,255,255,0.7);
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    .cost-hero-badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 12px;
+      padding: 0.6rem 1.2rem;
+      color: #fff;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      backdrop-filter: blur(6px);
+    }
+
+    /* ── Stat cards grid ─────────────────────────────────── */
+    .cost-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .cost-card {
+      background: var(--card-bg, #1e2a38);
+      border: 1px solid var(--border, #2a3a4a);
+      border-radius: 14px;
+      padding: 1.4rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      transition: transform 0.18s, box-shadow 0.18s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cost-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+    }
+
+    .cost-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 14px 14px 0 0;
+    }
+
+    .cost-card.blue::after   { background: #3b9eff; }
+    .cost-card.green::after  { background: #22c55e; }
+    .cost-card.amber::after  { background: #f59e0b; }
+    .cost-card.purple::after { background: #a855f7; }
+    .cost-card.teal::after   { background: #14b8a6; }
+
+    .cost-card-icon {
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+
+    .cost-card-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #cbd5e1;
+      font-weight: 700;
+    }
+
+    .cost-card-value {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.1;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+
+    .cost-card-value.loading {
+      color: #94a3b8;
+    }
+
+    .cost-card-sub {
+      font-size: 0.78rem;
+      color: #94a3b8;
+    }
+
+    /* Each card's value takes its accent color */
+    .cost-card.blue  .cost-card-value { color: #7ec8ff; }
+    .cost-card.green .cost-card-value { color: #4ade80; }
+    .cost-card.amber .cost-card-value { color: #fcd34d; }
+    .cost-card.purple .cost-card-value { color: #c084fc; }
+    .cost-card.teal  .cost-card-value { color: #2dd4bf; }
+
+    /* ── Breakdown table card ────────────────────────────── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-header .section-icon {
+      font-size: 1.2rem;
+    }
+
+    .section-header h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text, #e2eaf2);
+    }
+
+    .breakdown-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 0;
+      border-bottom: 1px solid var(--border, #2a3a4a);
+      gap: 1rem;
+    }
+
+    .breakdown-row:last-child {
+      border-bottom: none;
+    }
+
+    .breakdown-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .breakdown-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .breakdown-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .breakdown-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text, #e2eaf2);
+    }
+
+    .breakdown-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted, #8899aa);
+    }
+
+    .breakdown-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text, #e2eaf2);
+      text-align: right;
+    }
+
+    /* ── Progress bar ────────────────────────────────────── */
+    .progress-wrap {
+      margin-top: 1rem;
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted, #8899aa);
+      margin-bottom: 0.4rem;
+    }
+
+    .progress-bar-bg {
+      background: var(--border, #2a3a4a);
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, #3b9eff, #22c55e);
+      transition: width 1s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+
+    /* ── Tip banner ──────────────────────────────────────── */
+    .tip-banner {
+      background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(20,184,166,0.1));
+      border: 1px solid rgba(34,197,94,0.25);
+      border-radius: 12px;
+      padding: 1rem 1.3rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .tip-banner .tip-icon {
+      font-size: 1.3rem;
+      flex-shrink: 0;
+      margin-top: 0.05rem;
+    }
+
+    .tip-banner .tip-text {
+      font-size: 0.85rem;
+      color: var(--text-muted, #8899aa);
+      line-height: 1.5;
+    }
+
+    .tip-banner .tip-text strong {
+      color: #22c55e;
+    }
+
+    /* ── Skeleton shimmer ────────────────────────────────── */
+    @keyframes shimmer {
+      0%   { opacity: 0.4; }
+      50%  { opacity: 0.8; }
+      100% { opacity: 0.4; }
+    }
+
+    .shimmer {
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+
+    /* ── Fade-in on load ─────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-up {
+      animation: fadeUp 0.45s ease both;
+    }
+
+    .fade-up:nth-child(1) { animation-delay: 0.05s; }
+    .fade-up:nth-child(2) { animation-delay: 0.10s; }
+    .fade-up:nth-child(3) { animation-delay: 0.15s; }
+    .fade-up:nth-child(4) { animation-delay: 0.20s; }
+    .fade-up:nth-child(5) { animation-delay: 0.25s; }
+
+    @media (max-width: 600px) {
+      .cost-hero { flex-direction: column; align-items: flex-start; }
+      .cost-card-value { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">💧 <span>Smart</span> Water Guardian</a>
+  <ul class="navbar-nav">
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/tanker-log">Log Tanker</a></li>
+    <li><a href="/alerts">Alerts</a></li>
+    <li><a href="/cost" class="active">Cost</a></li>
+    <li><a href="/supplier">Suppliers</a></li>
+    <li><a href="/special-request">Special Request</a></li>
+    <li><a href="#" onclick="logout()" style="color:#ff8080;">Logout</a></li>
+  </ul>
+</nav>
+
+<div class="page-wrapper">
+
+  <!-- Hero banner -->
+  <div class="cost-hero fade-up">
+    <div class="cost-hero-text">
+      <h2>💰 Cost Summary</h2>
+      <p>Track your water expenditure and delivery history at a glance.</p>
+    </div>
+    <div class="cost-hero-badge" id="heroBadge">
+      📦 Loading deliveries...
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="cost-grid">
+    <div class="cost-card blue fade-up">
+      <div class="cost-card-icon">💸</div>
+      <div class="cost-card-label">Total Spent</div>
+      <div class="cost-card-value shimmer" id="totalSpent">—</div>
+      <div class="cost-card-sub">All time expenditure</div>
+    </div>
+
+    <div class="cost-card green fade-up">
+      <div class="cost-card-icon">📅</div>
+      <div class="cost-card-label">This Month</div>
+      <div class="cost-card-value shimmer" id="monthlySpent">—</div>
+      <div class="cost-card-sub">Current month spend</div>
+    </div>
+
+    <div class="cost-card amber fade-up">
+      <div class="cost-card-icon">🪣</div>
+      <div class="cost-card-label">Total Litres</div>
+      <div class="cost-card-value shimmer" id="totalLitres">—</div>
+      <div class="cost-card-sub">Water received overall</div>
+    </div>
+
+    <div class="cost-card purple fade-up">
+      <div class="cost-card-icon">⚖️</div>
+      <div class="cost-card-label">Avg Cost / Litre</div>
+      <div class="cost-card-value shimmer" id="avgCost">—</div>
+      <div class="cost-card-sub">Rupees per litre</div>
+    </div>
+
+    <div class="cost-card teal fade-up">
+      <div class="cost-card-icon">🚛</div>
+      <div class="cost-card-label">Total Deliveries</div>
+      <div class="cost-card-value shimmer" id="totalDeliveries">—</div>
+      <div class="cost-card-sub">Tanker trips logged</div>
+    </div>
+  </div>
+
+  <!-- Breakdown card -->
+  <div class="card fade-up">
+    <div class="section-header">
+      <span class="section-icon">📊</span>
+      <h3>Cost Breakdown</h3>
+    </div>
+
+    <div class="breakdown-row">
+      <div class="breakdown-left">
+        <div class="breakdown-dot" style="background:#3b9eff;"></div>
+        <div class="breakdown-meta">
+          <div class="breakdown-name">💰 Total Amount Spent</div>
+          <div class="breakdown-desc">Cumulative spend across all deliveries</div>
+        </div>
+      </div>
+      <div class="breakdown-value" id="bd_totalSpent">—</div>
+    </div>
+
+    <div class="breakdown-row">
+      <div class="breakdown-left">
+        <div class="breakdown-dot" style="background:#22c55e;"></div>
+        <div class="breakdown-meta">
+          <div class="breakdown-name">📅 Monthly Spend</div>
+          <div class="breakdown-desc">Amount spent in the current month</div>
+        </div>
+      </div>
+      <div class="breakdown-value" id="bd_monthly">—</div>
+    </div>
+
+    <div class="breakdown-row">
+      <div class="breakdown-left">
+        <div class="breakdown-dot" style="background:#f59e0b;"></div>
+        <div class="breakdown-meta">
+          <div class="breakdown-name">🪣 Total Water Received</div>
+          <div class="breakdown-desc">Total litres delivered to your home</div>
+        </div>
+      </div>
+      <div class="breakdown-value" id="bd_litres">—</div>
+    </div>
+
+    <div class="breakdown-row">
+      <div class="breakdown-left">
+        <div class="breakdown-dot" style="background:#a855f7;"></div>
+        <div class="breakdown-meta">
+          <div class="breakdown-name">⚖️ Average Cost per Litre</div>
+          <div class="breakdown-desc">Your effective rate across all orders</div>
+        </div>
+      </div>
+      <div class="breakdown-value" id="bd_avg">—</div>
+    </div>
+
+    <div class="breakdown-row">
+      <div class="breakdown-left">
+        <div class="breakdown-dot" style="background:#14b8a6;"></div>
+        <div class="breakdown-meta">
+          <div class="breakdown-name">🚛 Deliveries Logged</div>
+          <div class="breakdown-desc">Total number of tanker trips recorded</div>
+        </div>
+      </div>
+      <div class="breakdown-value" id="bd_deliveries">—</div>
+    </div>
+
+    <!-- Monthly vs Total progress -->
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>📈 Monthly vs Total Spend</span>
+        <span id="progressPct">—</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tip banner -->
+  <div class="tip-banner fade-up">
+    <div class="tip-icon">💡</div>
+    <div class="tip-text">
+      <strong>Money-saving tip:</strong>
+      Ordering larger quantities per delivery typically reduces your average cost per litre.
+      Compare supplier rates on the <a href="/supplier" style="color:#22c55e;">Suppliers</a> page to get the best deal.
+    </div>
+  </div>
+
+</div><!-- end page-wrapper -->
+
+<script src="/static/script.js"></script>
+<script>
+
+// ── Format currency (₹) ───────────────────────────────────
+function formatINR(val) {
+  if (val === null || val === undefined) return '—';
+  return '₹ ' + Number(val).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+// ── Format litres ─────────────────────────────────────────
+function formatLitres(val) {
+  if (val === null || val === undefined) return '—';
+  return Number(val).toLocaleString('en-IN') + ' L';
+}
+
+// ── Remove shimmer once data arrives ──────────────────────
+function clearShimmer() {
+  document.querySelectorAll('.shimmer').forEach(el => el.classList.remove('shimmer'));
+}
+
+// ── Load cost data ────────────────────────────────────────
+async function loadCost() {
+  try {
+    const data = await get('/cost/summary');
+
+    // Hero badge
+    document.getElementById('heroBadge').textContent =
+      `📦 ${data.total_deliveries} Deliver${data.total_deliveries === 1 ? 'y' : 'ies'} Logged`;
+
+    // Stat cards
+    document.getElementById('totalSpent').textContent      = formatINR(data.total_spent);
+    document.getElementById('monthlySpent').textContent    = formatINR(data.monthly_spent);
+    document.getElementById('totalLitres').textContent     = formatLitres(data.total_litres);
+    document.getElementById('avgCost').textContent         = '₹ ' + data.avg_cost_per_litre;
+    document.getElementById('totalDeliveries').textContent = data.total_deliveries;
+
+    // Breakdown rows
+    document.getElementById('bd_totalSpent').textContent  = formatINR(data.total_spent);
+    document.getElementById('bd_monthly').textContent     = formatINR(data.monthly_spent);
+    document.getElementById('bd_litres').textContent      = formatLitres(data.total_litres);
+    document.getElementById('bd_avg').textContent         = '₹ ' + data.avg_cost_per_litre + ' / L';
+    document.getElementById('bd_deliveries').textContent  = data.total_deliveries + ' trips';
+
+    // Progress bar — monthly as % of total
+    const pct = data.total_spent > 0
+      ? Math.min(100, Math.round((data.monthly_spent / data.total_spent) * 100))
+      : 0;
+    document.getElementById('progressPct').textContent   = pct + '% this month';
+    document.getElementById('progressFill').style.width  = pct + '%';
+
+    clearShimmer();
+
+  } catch (err) {
+    console.error('Failed to load cost summary:', err);
+    document.getElementById('heroBadge').textContent = '⚠️ Could not load data';
+    clearShimmer();
+  }
+}
+
+// ── Logout ────────────────────────────────────────────────
+async function logout() {
+  await post('/logout');
+  localStorage.removeItem('swg_user');
+  window.location.href = '/login';
+}
+
+// ── Init ──────────────────────────────────────────────────
+async function init() {
+  const user = await requireLogin();
+  if (!user) return;
+  loadCost();
+}
+
+init();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Smart Water Guardian</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">💧 <span>Smart</span> Water Guardian</a>
+  <ul class="navbar-nav">
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/tanker-log">Log Tanker</a></li>
+    <li><a href="/alerts">Alerts</a></li>
+    <li><a href="/cost">Cost</a></li>
+    <li><a href="/supplier">Suppliers</a></li>
+    <li><a href="/special-request">Special Request</a></li>
+    <li><a href="#" onclick="logout()" style="color:#ff8080;">Logout</a></li>
+  </ul>
+</nav>
+
+<div class="page-wrapper">
+
+  <!-- Welcome bar -->
+  <div class="flex-between mb-2">
+    <h1 class="page-title" style="margin-bottom:0;">
+      👋 Welcome, <span id="userName">...</span>
+    </h1>
+    <span id="lastUpdated" class="text-muted"></span>
+  </div>
+
+  <!-- Weekly checkin alert banner -->
+  <div id="weeklyAlert" class="alert-banner warning" style="display:none;">
+    <span class="alert-icon">🔔</span>
+    <div style="flex:1;">
+      <strong>Weekly Check-in</strong>
+      <p id="weeklyAlertMsg" style="margin-top:0.2rem;"></p>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-shrink:0;">
+      <button class="btn btn-success" onclick="respondAlert(false)">
+        ✅ Still have water
+      </button>
+      <button class="btn btn-danger" onclick="respondAlert(true)">
+        🚨 Need refill
+      </button>
+    </div>
+  </div>
+
+  <!-- Refill needed banner -->
+  <div id="refillBanner" class="alert-banner danger" style="display:none;">
+    <span class="alert-icon">🚨</span>
+    <div style="flex:1;">
+      <strong>Refill Needed!</strong>
+      <p style="margin-top:0.2rem;">
+        You indicated you need water. Please visit the supplier portal.
+      </p>
+    </div>
+    <a href="/supplier" class="btn btn-danger">View Suppliers →</a>
+  </div>
+
+  <!-- Special request active banner -->
+  <div id="specialBanner" class="alert-banner info" style="display:none;">
+    <span class="alert-icon">⚡</span>
+    <div>
+      <strong>Special Period Active: <span id="specialTitle"></span></strong>
+      <p style="margin-top:0.2rem;">
+        Extra usage accounted for until <span id="specialEnd"></span>.
+        Your daily estimate has been adjusted.
+      </p>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stat-grid">
+
+    <div class="stat-card" id="cardLevel">
+      <div class="stat-value" id="statLevel">—</div>
+      <div class="stat-label">Estimated Litres Remaining</div>
+    </div>
+
+    <div class="stat-card" id="cardDays">
+      <div class="stat-value" id="statDays">—</div>
+      <div class="stat-label">Days of Water Left</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-value" id="statAvg">—</div>
+      <div class="stat-label">Avg Daily Usage (Litres)</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-value" id="statAlerts" style="color:var(--warning);">—</div>
+      <div class="stat-label">Unread Alerts</div>
+    </div>
+
+  </div>
+
+  <!-- Status indicator -->
+  <div class="card" id="statusCard">
+    <div class="flex-between">
+      <div>
+        <div class="card-title" style="border:none;margin:0;padding:0;">
+          Water Status
+        </div>
+        <div id="statusText" style="font-size:1.1rem;margin-top:0.3rem;font-weight:600;">
+          Calculating...
+        </div>
+        <div id="statusSubtext" class="text-muted mt-1"></div>
+      </div>
+      <div id="statusEmoji" style="font-size:4rem;">💧</div>
+    </div>
+
+    <!-- Water level bar -->
+    <div style="margin-top:1.2rem;">
+      <div class="flex-between mb-1">
+        <span class="text-muted" style="font-size:0.82rem;">Water level estimate</span>
+        <span id="levelPercent" class="text-muted" style="font-size:0.82rem;"></span>
+      </div>
+      <div style="background:var(--border);border-radius:20px;height:14px;overflow:hidden;">
+        <div id="levelBar"
+             style="height:100%;border-radius:20px;background:var(--success);
+                    width:0%;transition:width 0.8s ease;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="card">
+    <div class="card-title">Quick Actions</div>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+      <a href="/tanker-log" class="btn btn-primary">
+        🚛 Log Tanker Delivery
+      </a>
+      <a href="/supplier" class="btn btn-success">
+        📞 Find Supplier
+      </a>
+      <a href="/special-request" class="btn btn-outline">
+        📋 Special Request
+      </a>
+      <a href="/cost" class="btn btn-outline">
+        💰 View Cost Summary
+      </a>
+    </div>
+  </div>
+
+  <!-- Recent deliveries -->
+  <div class="card">
+    <div class="flex-between mb-2">
+      <div class="card-title" style="margin:0;border:none;padding:0;">
+        Recent Tanker Deliveries
+      </div>
+      <a href="/tanker-log" class="btn btn-outline" style="padding:0.3rem 0.8rem;font-size:0.82rem;">
+        + Log New
+      </a>
+    </div>
+
+    <div class="table-wrapper">
+      <table id="deliveryTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Litres</th>
+            <th>Cost/Litre</th>
+            <th>Total Cost</th>
+            <th>Supplier</th>
+          </tr>
+        </thead>
+        <tbody id="deliveryBody">
+          <tr>
+            <td colspan="5" class="text-center text-muted" style="padding:2rem;">
+              Loading...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+let currentAlertId = null;
+
+// ── Logout ────────────────────────────────────────────────
+async function logout() {
+  await post('/logout');
+  localStorage.removeItem('swg_user');
+  window.location.href = '/login';
+}
+
+// ── Load dashboard data ───────────────────────────────────
+async function loadDashboard() {
+  const user = await requireLogin();
+  if (!user) return;
+
+  // Show username
+  document.getElementById('userName').textContent = user.name;
+  document.getElementById('lastUpdated').textContent =
+    'Updated: ' + new Date().toLocaleTimeString('en-IN');
+
+  // Fetch dashboard data
+  const data = await get('/api/dashboard');
+
+  // ── Stat cards ────────────────────────────────────────
+  document.getElementById('statLevel').textContent =
+    data.current_level !== null ? data.current_level + ' L' : '—';
+
+  document.getElementById('statDays').textContent =
+    data.days_remaining !== null ? data.days_remaining : '—';
+
+  document.getElementById('statAvg').textContent =
+    data.avg_daily_usage !== null ? data.avg_daily_usage + ' L' : '—';
+
+  document.getElementById('statAlerts').textContent =
+    data.unread_alerts || '0';
+
+  // ── Status card ───────────────────────────────────────
+  const statusMap = {
+    safe:     { text: '✅ Safe',         sub: 'You have enough water. No action needed.', emoji: '💧', color: 'var(--success)', bar: 'var(--success)' },
+    warning:  { text: '⚠️ Running Low',  sub: 'Plan a refill soon.',                      emoji: '⚠️', color: 'var(--warning)', bar: 'var(--warning)' },
+    critical: { text: '🚨 Critical',     sub: 'Order a tanker immediately!',              emoji: '🚨', color: 'var(--danger)',  bar: 'var(--danger)'  },
+    unknown:  { text: '❓ Not enough data', sub: 'Log your first tanker delivery to get started.', emoji: '❓', color: 'var(--text-muted)', bar: 'var(--border)' }
+  };
+
+  const s = statusMap[data.status] || statusMap.unknown;
+  document.getElementById('statusText').textContent    = s.text;
+  document.getElementById('statusText').style.color   = s.color;
+  document.getElementById('statusSubtext').textContent = s.sub;
+  document.getElementById('statusEmoji').textContent  = s.emoji;
+
+  // Apply status colour to stat cards
+  const cardDays  = document.getElementById('cardDays');
+  const statDays  = document.getElementById('statDays');
+  const cardLevel = document.getElementById('cardLevel');
+
+  cardDays.className  = 'stat-card ' + (data.status !== 'unknown' ? data.status : '');
+  statDays.className  = 'stat-value '+ (data.status !== 'unknown' ? data.status : '');
+  cardLevel.className = 'stat-card ' + (data.status !== 'unknown' ? data.status : '');
+
+  // Water level bar (estimate as % of 2000L typical tanker)
+  if (data.current_level !== null) {
+    const pct = Math.min(Math.round((data.current_level / 2000) * 100), 100);
+    document.getElementById('levelBar').style.width       = pct + '%';
+    document.getElementById('levelBar').style.background  = s.bar;
+    document.getElementById('levelPercent').textContent   = pct + '%';
+  }
+
+  // ── Weekly alert banner ───────────────────────────────
+  if (data.weekly_alert) {
+    currentAlertId = data.weekly_alert.alert_id;
+    document.getElementById('weeklyAlertMsg').textContent = data.weekly_alert.message;
+    document.getElementById('weeklyAlert').style.display = 'flex';
+  }
+
+  // ── Special request banner ────────────────────────────
+  if (data.active_request) {
+    document.getElementById('specialTitle').textContent =
+      data.active_request.title;
+    document.getElementById('specialEnd').textContent =
+      formatDate(data.active_request.end_date);
+    document.getElementById('specialBanner').style.display = 'flex';
+  }
+
+  // ── Load recent deliveries ────────────────────────────
+  loadDeliveries();
+}
+
+// ── Respond to weekly alert ───────────────────────────────
+async function respondAlert(needsWater) {
+  if (!currentAlertId) return;
+
+  const result = await post(`/alerts/${currentAlertId}/respond`, {
+    needs_water: needsWater
+  });
+
+  document.getElementById('weeklyAlert').style.display = 'none';
+
+  if (needsWater) {
+    document.getElementById('refillBanner').style.display = 'flex';
+    showToast('Refill alert created. Please contact a supplier.', 'warning');
+  } else {
+    showToast('Got it! We will check again next week.', 'success');
+  }
+}
+
+// ── Load recent deliveries ────────────────────────────────
+async function loadDeliveries() {
+  const data = await get('/tanker/history');
+  const body = document.getElementById('deliveryBody');
+
+  if (!data.length) {
+    body.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center text-muted" style="padding:2rem;">
+          No deliveries logged yet.
+          <a href="/tanker-log" style="color:var(--primary-mid);">Log your first one →</a>
+        </td>
+      </tr>`;
+    return;
+  }
+
+  // Show only last 5
+  body.innerHTML = data.slice(0, 5).map(log => `
+    <tr>
+      <td>${formatDate(log.delivery_date)}</td>
+      <td><strong>${log.litres} L</strong></td>
+      <td>₹${log.cost_per_litre || '—'}</td>
+      <td>₹${log.total_cost || '—'}</td>
+      <td>${log.supplier_name || '—'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Init ──────────────────────────────────────────────────
+loadDashboard();
+</script>
+
+</body>
+</html>
