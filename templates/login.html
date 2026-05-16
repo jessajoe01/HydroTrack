@@ -3,82 +3,373 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — Smart Water Guardian</title>
+  <title>HydroTrack — Smart Water Guardian</title>
   <link rel="stylesheet" href="/static/style.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      background: #f4f7fb;
+    }
+    .left-panel {
+      width: 55%;
+      background: #0a1628;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .wave-bg { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+    .wave { position: absolute; bottom: 0; left: 0; width: 200%; height: 280px; border-radius: 50% 50% 0 0 / 40% 40% 0 0; }
+    .wave1 { background: rgba(0,100,180,0.25); animation: waveMove 8s ease-in-out infinite; }
+    .wave2 { background: rgba(0,150,220,0.18); bottom: 30px; animation: waveMove 6s ease-in-out infinite reverse; }
+    .wave3 { background: rgba(0,200,255,0.1); bottom: 60px; animation: waveMove 10s ease-in-out infinite; }
+    @keyframes waveMove {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(-25%); }
+    }
+    .brand { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 3rem; position: relative; z-index: 1; }
+    .brand-icon { font-size: 2.5rem; }
+    .brand-name { font-size: 1.8rem; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+    .brand-name span { color: #00E5FF; }
+    .hero-title { font-size: 2.6rem; font-weight: 800; color: #fff; line-height: 1.2; margin-bottom: 1.2rem; position: relative; z-index: 1; }
+    .hero-subtitle { font-size: 1rem; color: rgba(255,255,255,0.7); line-height: 1.7; margin-bottom: 2.5rem; max-width: 420px; position: relative; z-index: 1; }
+    .feature-list { list-style: none; position: relative; z-index: 1; }
+    .feature-list li { display: flex; align-items: center; gap: 0.8rem; color: rgba(255,255,255,0.85); font-size: 0.95rem; margin-bottom: 0.9rem; }
+    .feature-list li .dot { width: 8px; height: 8px; border-radius: 50%; background: #00E5FF; flex-shrink: 0; box-shadow: 0 0 8px #00E5FF; }
+    .tanker-illustration { position: absolute; bottom: 4rem; right: 2rem; font-size: 7rem; opacity: 0.15; z-index: 1; transform: scaleX(-1); }
+    .right-panel { width: 45%; display: flex; align-items: center; justify-content: center; padding: 3rem 2.5rem; background: #b8cfe8; overflow-y: auto; }
+    .login-box { width: 100%; max-width: 400px; }
+    .login-box h2 { font-size: 1.7rem; font-weight: 800; color: #0a1628; margin-bottom: 0.3rem; letter-spacing: -0.5px; }
+    .login-box .subtitle { color: #2c4a6e; font-size: 0.92rem; margin-bottom: 2rem; font-weight: 500; }
+    .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.8rem; }
+    .role-card { border: 2.5px solid #c8007a; border-radius: 16px; padding: 1.5rem 1rem; text-align: center; cursor: pointer; transition: all 0.25s; background: rgba(255,255,255,0.5); }
+    .role-card:hover { background: rgba(255,255,255,0.75); transform: translateY(-3px); box-shadow: 0 8px 24px rgba(200,0,122,0.2); }
+    .role-card.active { background: rgba(255,255,255,0.9); border-color: #e0008e; box-shadow: 0 8px 24px rgba(200,0,122,0.3); }
+    .role-card .icon { font-size: 2.4rem; margin-bottom: 0.7rem; }
+    .role-card .label { font-size: 0.92rem; font-weight: 800; color: #0a1628; margin-bottom: 0.3rem; font-family: 'Georgia', serif; }
+    .role-card .desc { font-size: 0.73rem; color: #2c4a6e; line-height: 1.4; }
+    .register-links { text-align: center; font-size: 0.82rem; color: #2c4a6e; line-height: 2; }
+    .register-links a { color: #c8007a; font-weight: 700; text-decoration: none; }
+    .register-links a:hover { text-decoration: underline; }
+    .form-section { display: none; }
+    .form-section.show { display: block; }
+    .back-btn { display: flex; align-items: center; gap: 0.4rem; background: none; border: none; color: #c8007a; font-size: 0.88rem; cursor: pointer; margin-bottom: 1rem; padding: 0; font-weight: 700; }
+    .back-btn:hover { color: #0a1628; }
+    .portal-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(200,0,122,0.12); color: #c8007a; font-size: 0.82rem; font-weight: 700; padding: 0.35rem 1rem; border-radius: 20px; margin-bottom: 1.2rem; border: 1.5px solid rgba(200,0,122,0.3); font-family: 'Georgia', serif; }
+    .tab-switch { display: flex; gap: 0; margin-bottom: 1.5rem; border-radius: 10px; overflow: hidden; border: 2px solid #c8007a; }
+    .tab-switch button { flex: 1; padding: 0.5rem; border: none; background: transparent; color: #c8007a; font-weight: 700; cursor: pointer; font-size: 0.88rem; transition: all 0.2s; }
+    .tab-switch button.active { background: #c8007a; color: #fff; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.85rem; font-weight: 700; color: #0a1628; margin-bottom: 0.35rem; }
+    .form-group input, .form-group select { width: 100%; padding: 0.65rem 1rem; border: 2px solid rgba(200,0,122,0.3); border-radius: 10px; font-size: 0.95rem; color: #0a1628; background: rgba(255,255,255,0.7); transition: border-color 0.2s; outline: none; }
+    .form-group input:focus, .form-group select:focus { border-color: #c8007a; background: #fff; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .btn-signin { width: 100%; padding: 0.8rem; background: linear-gradient(135deg, #c8007a, #0a1628); color: #fff; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 0.5rem; transition: opacity 0.2s; font-family: 'Georgia', serif; }
+    .btn-signin:hover { opacity: 0.9; }
+    .btn-signin:disabled { opacity: 0.6; cursor: not-allowed; }
+    .divider { text-align: center; color: #2c4a6e; font-size: 0.82rem; margin: 1rem 0; position: relative; }
+    .divider::before, .divider::after { content: ''; position: absolute; top: 50%; width: 42%; height: 1px; background: rgba(200,0,122,0.25); }
+    .divider::before { left: 0; }
+    .divider::after { right: 0; }
+    .reg-link { text-align: center; font-size: 0.85rem; color: #2c4a6e; }
+    .reg-link a { color: #c8007a; font-weight: 700; text-decoration: none; }
+    .error-msg { background: rgba(220,53,69,0.12); color: #721C24; border: 1px solid rgba(220,53,69,0.3); padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; display: none; }
+    .success-msg { background: rgba(40,167,69,0.12); color: #155724; border: 1px solid rgba(40,167,69,0.3); padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; display: none; }
+    @media (max-width: 768px) { .left-panel { display: none; } .right-panel { width: 100%; } }
+  </style>
 </head>
 <body>
 
-<div class="auth-wrapper">
-  <div class="auth-card">
+<div class="left-panel">
+  <div class="wave-bg">
+    <div class="wave wave1"></div>
+    <div class="wave wave2"></div>
+    <div class="wave wave3"></div>
+  </div>
+  <div class="brand">
+    <div class="brand-icon">💧</div>
+    <div class="brand-name">Hydro<span>Track</span></div>
+  </div>
+  <h1 class="hero-title">Smart Water<br>Management<br>System</h1>
+  <p class="hero-subtitle">Track your tanker deliveries, predict water shortage in advance, and connect with suppliers — all in one intelligent platform.</p>
+  <ul class="feature-list">
+    <li><span class="dot"></span> Predict when your water will run out</li>
+    <li><span class="dot"></span> Get alerts 4, 3, 2 days before shortage</li>
+    <li><span class="dot"></span> Find suppliers with live route maps</li>
+    <li><span class="dot"></span> Submit special requests for events</li>
+    <li><span class="dot"></span> Supplier agents manage deliveries live</li>
+  </ul>
+  <div class="tanker-illustration">🚛</div>
+</div>
 
-    <div class="auth-logo">
-      <div style="font-size:3rem;">💧</div>
-      <h1>Smart Water Guardian</h1>
-      <p>Sign in to manage your water supply</p>
+<div class="right-panel">
+  <div class="login-box">
+
+    <!-- Step 1: Role Selection -->
+    <div id="stepRole">
+      <h2>Welcome Back</h2>
+      <p class="subtitle">Select your role to sign in to your portal</p>
+      <div class="role-grid">
+        <div class="role-card" id="userCard" onclick="selectRole('user')">
+          <div class="icon">🏠</div>
+          <div class="label">Household User</div>
+          <div class="desc">Track usage, get alerts, find suppliers</div>
+        </div>
+        <div class="role-card" id="agentCard" onclick="selectRole('agent')">
+          <div class="icon">🏢</div>
+          <div class="label">Supplier Agent</div>
+          <div class="desc">Manage deliveries and special requests</div>
+        </div>
+      </div>
+      <div class="register-links">
+        New here? <a href="/register">Create household account</a><br>
+        New supplier? <a href="#" onclick="selectRole('agent'); switchTab('register')">Register as agent</a>
+      </div>
     </div>
 
-    <div id="errorMsg" class="alert-banner danger" style="display:none;">
-      <span class="alert-icon">⚠️</span>
-      <span id="errorText"></span>
+    <!-- User Login Form -->
+    <div class="form-section" id="userForm">
+      <button class="back-btn" onclick="goBack()">← Back to roles</button>
+      <div class="portal-badge">🏠 Household User Portal</div>
+      <div class="error-msg" id="userError"></div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" id="userEmail" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="userPassword" placeholder="Enter your password"
+          onkeydown="if(event.key==='Enter') doUserLogin()">
+      </div>
+      <button class="btn-signin" id="userBtn" onclick="doUserLogin()">Sign In to Dashboard</button>
+      <div class="divider">or</div>
+      <div class="reg-link">Don't have an account? <a href="/register">Register here</a></div>
     </div>
 
-    <form id="loginForm">
-      <div class="form-group">
-        <label for="email">Email Address</label>
-        <input type="email" id="email" placeholder="you@example.com" required>
+    <!-- Agent Login + Register Form -->
+    <div class="form-section" id="agentForm">
+      <button class="back-btn" onclick="goBack()">← Back to roles</button>
+      <div class="portal-badge">🏢 Supplier Agent Portal</div>
+
+      <div class="tab-switch">
+        <button id="tabLogin" class="active" onclick="switchTab('login')">Sign In</button>
+        <button id="tabRegister" onclick="switchTab('register')">Register</button>
       </div>
 
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" placeholder="Enter your password" required>
+      <!-- Agent Login -->
+      <div id="agentLoginForm">
+        <div class="error-msg" id="agentError"></div>
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="agentEmail" placeholder="agent@company.com">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="agentPassword" placeholder="Enter your password"
+            onkeydown="if(event.key==='Enter') doAgentLogin()">
+        </div>
+        <button class="btn-signin" id="agentBtn" onclick="doAgentLogin()">Sign In as Agent</button>
       </div>
 
-      <button type="submit" class="btn btn-primary btn-full btn-lg mt-2" id="loginBtn">
-        Sign In
-      </button>
-    </form>
-
-    <p class="text-center text-muted mt-2">
-      Don't have an account?
-      <a href="/register" style="color: var(--primary-mid); font-weight:600;">Register here</a>
-    </p>
+      <!-- Agent Register -->
+      <div id="agentRegisterForm" style="display:none;">
+        <div class="error-msg" id="regError"></div>
+        <div class="success-msg" id="regSuccess">Account created! Please sign in.</div>
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" id="regName" placeholder="Full name">
+        </div>
+        <div class="form-group">
+          <label>Company Name</label>
+          <input type="text" id="regCompany" placeholder="e.g. City Water Co">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="regEmail" placeholder="you@company.com">
+          </div>
+          <div class="form-group">
+            <label>Contact</label>
+            <input type="tel" id="regContact" placeholder="10-digit number">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Service Area</label>
+          <input type="text" id="regArea" placeholder="e.g. North Bangalore">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="regPassword" placeholder="Min 6 characters">
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <input type="password" id="regConfirm" placeholder="Repeat password">
+          </div>
+        </div>
+        <div class="form-group" style="background:rgba(255,255,255,0.5);padding:0.8rem;border-radius:10px;">
+          <label>📍 Your Location</label>
+          <p style="font-size:0.78rem;color:#2c4a6e;margin-bottom:0.5rem;">Used for route planning with users</p>
+          <button type="button" onclick="getAgentLocation()" id="agentGpsBtn"
+            style="width:100%;padding:0.5rem;background:rgba(200,0,122,0.1);border:1.5px solid #c8007a;border-radius:8px;color:#c8007a;font-weight:700;cursor:pointer;font-size:0.85rem;">
+            📍 Detect My Location
+          </button>
+          <p id="agentLocStatus" style="font-size:0.78rem;color:#2c4a6e;margin-top:0.4rem;">No location detected yet</p>
+          <input type="hidden" id="regLat" value="12.9716">
+          <input type="hidden" id="regLng" value="77.5946">
+        </div>
+        <button class="btn-signin" id="regBtn" onclick="doAgentRegister()">Create Agent Account</button>
+      </div>
+    </div>
 
   </div>
 </div>
 
 <script src="/static/script.js"></script>
 <script>
-  document.getElementById('loginForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
+function selectRole(role) {
+  document.getElementById('stepRole').style.display = 'none';
+  document.getElementById('userForm').classList.remove('show');
+  document.getElementById('agentForm').classList.remove('show');
+  document.getElementById('userCard').classList.remove('active');
+  document.getElementById('agentCard').classList.remove('active');
+  if (role === 'user') {
+    document.getElementById('userCard').classList.add('active');
+    document.getElementById('userForm').classList.add('show');
+    setTimeout(() => document.getElementById('userEmail').focus(), 100);
+  } else {
+    document.getElementById('agentCard').classList.add('active');
+    document.getElementById('agentForm').classList.add('show');
+    setTimeout(() => document.getElementById('agentEmail').focus(), 100);
+  }
+}
 
-    const btn      = document.getElementById('loginBtn');
-    const errorDiv = document.getElementById('errorMsg');
-    const errorTxt = document.getElementById('errorText');
+function switchTab(tab) {
+  document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+  document.getElementById('agentLoginForm').style.display    = tab === 'login' ? 'block' : 'none';
+  document.getElementById('agentRegisterForm').style.display = tab === 'register' ? 'block' : 'none';
+}
 
-    btn.textContent = 'Signing in...';
-    btn.disabled    = true;
-    errorDiv.style.display = 'none';
+function goBack() {
+  document.getElementById('stepRole').style.display = 'block';
+  document.getElementById('userForm').classList.remove('show');
+  document.getElementById('agentForm').classList.remove('show');
+  document.getElementById('userCard').classList.remove('active');
+  document.getElementById('agentCard').classList.remove('active');
+}
 
-    const data = await post('/login', {
-      email:    document.getElementById('email').value,
-      password: document.getElementById('password').value
-    });
-
-    if (data.status === 'success') {
-      // Save user info to localStorage for navbar use
-      localStorage.setItem('swg_user', JSON.stringify({
-        name:    data.name,
-        user_id: data.user_id
-      }));
-      window.location.href = '/dashboard';
-    } else {
-      errorTxt.textContent   = data.error || 'Login failed. Please try again.';
-      errorDiv.style.display = 'flex';
-      btn.textContent        = 'Sign In';
-      btn.disabled           = false;
+function getAgentLocation() {
+  const btn    = document.getElementById('agentGpsBtn');
+  const status = document.getElementById('agentLocStatus');
+  btn.textContent = '⏳ Detecting...';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById('regLat').value = pos.coords.latitude;
+      document.getElementById('regLng').value = pos.coords.longitude;
+      status.textContent = `✅ Location detected: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+      btn.textContent = '✅ Location Detected';
+    },
+    () => {
+      status.textContent = '⚠️ Could not detect. Default Bangalore location will be used.';
+      btn.textContent = '📍 Retry Location';
     }
-  });
-</script>
+  );
+}
 
+async function doUserLogin() {
+  const btn = document.getElementById('userBtn');
+  const err = document.getElementById('userError');
+  err.style.display = 'none';
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+  const data = await post('/login', {
+    email:    document.getElementById('userEmail').value,
+    password: document.getElementById('userPassword').value
+  });
+  if (data.status === 'success') {
+    localStorage.setItem('swg_user', JSON.stringify({ name: data.name, user_id: data.user_id }));
+    window.location.href = '/dashboard';
+  } else {
+    err.textContent = data.error || 'Login failed.';
+    err.style.display = 'block';
+    btn.textContent = 'Sign In to Dashboard';
+    btn.disabled = false;
+  }
+}
+
+async function doAgentLogin() {
+  const btn = document.getElementById('agentBtn');
+  const err = document.getElementById('agentError');
+  err.style.display = 'none';
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+  const res  = await fetch('/supplier-agent/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+    body: JSON.stringify({ email: document.getElementById('agentEmail').value, password: document.getElementById('agentPassword').value })
+  });
+  const data = await res.json();
+  if (data.status === 'success') {
+    localStorage.setItem('supplier_agent', JSON.stringify(data.agent));
+    window.location.href = '/supplier-portal/dashboard';
+  } else {
+    err.textContent = data.error || 'Login failed.';
+    err.style.display = 'block';
+    btn.textContent = 'Sign In as Agent';
+    btn.disabled = false;
+  }
+}
+
+async function doAgentRegister() {
+  const btn = document.getElementById('regBtn');
+  const err = document.getElementById('regError');
+  const suc = document.getElementById('regSuccess');
+  err.style.display = 'none';
+  suc.style.display = 'none';
+  const password = document.getElementById('regPassword').value;
+  const confirm  = document.getElementById('regConfirm').value;
+  if (password !== confirm) {
+    err.textContent = 'Passwords do not match.';
+    err.style.display = 'block';
+    return;
+  }
+  if (password.length < 6) {
+    err.textContent = 'Password must be at least 6 characters.';
+    err.style.display = 'block';
+    return;
+  }
+  btn.textContent = 'Creating account...';
+  btn.disabled = true;
+  const res = await fetch('/supplier-agent/register', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+    body: JSON.stringify({
+      name:         document.getElementById('regName').value,
+      company_name: document.getElementById('regCompany').value,
+      email:        document.getElementById('regEmail').value,
+      contact:      document.getElementById('regContact').value,
+      area:         document.getElementById('regArea').value,
+      password:     password,
+      lat:          parseFloat(document.getElementById('regLat').value),
+      lng:          parseFloat(document.getElementById('regLng').value)
+    })
+  });
+  const data = await res.json();
+  if (data.status === 'success') {
+    suc.style.display = 'block';
+    setTimeout(() => switchTab('login'), 1800);
+  } else {
+    err.textContent = data.error || 'Registration failed.';
+    err.style.display = 'block';
+  }
+  btn.textContent = 'Create Agent Account';
+  btn.disabled = false;
+}
+</script>
 </body>
 </html>

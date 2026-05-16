@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-
 <nav class="navbar">
   <a href="/dashboard" class="navbar-brand">💧 <span>Smart</span> Water Guardian</a>
   <ul class="navbar-nav">
@@ -22,10 +21,8 @@
 </nav>
 
 <div class="page-wrapper">
-
   <h1 class="page-title">🚛 Log Tanker Delivery</h1>
 
-  <!-- Log form -->
   <div class="card">
     <div class="card-title">New Delivery</div>
 
@@ -33,45 +30,47 @@
       <span class="alert-icon">✅</span>
       <span>Delivery logged successfully! Dashboard has been updated.</span>
     </div>
-
     <div id="errorMsg" class="alert-banner danger" style="display:none;">
       <span class="alert-icon">⚠️</span>
       <span id="errorText"></span>
     </div>
 
-    <form id="tankerForm">
+    <!-- Auto-fill info banner -->
+    <div id="autoFillBanner" class="alert-banner info" style="display:none;">
+      <span class="alert-icon">💡</span>
+      <span id="autoFillText"></span>
+    </div>
 
+    <form id="tankerForm">
       <div class="form-row">
         <div class="form-group">
           <label for="deliveryDate">Delivery Date</label>
           <input type="date" id="deliveryDate" required>
         </div>
         <div class="form-group">
-          <label for="litres">Litres Delivered</label>
-          <input type="number" id="litres" placeholder="e.g. 2000"
-                 min="1" step="0.1" required>
+          <label for="supplierSelect">Supplier Name</label>
+          <select id="supplierSelect" onchange="onSupplierSelect()">
+            <option value="">-- Select Supplier --</option>
+          </select>
         </div>
       </div>
 
       <div class="form-row">
         <div class="form-group">
-          <label for="costPerLitre">Cost per Litre (₹)</label>
-          <input type="number" id="costPerLitre" placeholder="e.g. 0.50"
-                 min="0" step="0.01">
+          <label for="litres">Litres Delivered</label>
+          <input type="number" id="litres" placeholder="e.g. 2000" min="1" step="0.1" required>
         </div>
         <div class="form-group">
-          <label for="supplierName">Supplier Name</label>
-          <input type="text" id="supplierName" placeholder="e.g. City Water Co">
+          <label for="costPerLitre">Cost per Litre (₹)</label>
+          <input type="number" id="costPerLitre" placeholder="e.g. 0.50" min="0" step="0.01">
         </div>
       </div>
 
       <div class="form-group">
         <label for="notes">Notes (optional)</label>
-        <textarea id="notes" rows="2"
-                  placeholder="Any additional notes about this delivery..."></textarea>
+        <textarea id="notes" rows="2" placeholder="Any additional notes about this delivery..."></textarea>
       </div>
 
-      <!-- Live cost preview -->
       <div id="costPreview" class="alert-banner info" style="display:none;">
         <span class="alert-icon">💰</span>
         <span id="costPreviewText"></span>
@@ -85,14 +84,11 @@
           Clear
         </button>
       </div>
-
     </form>
   </div>
 
-  <!-- Delivery history -->
   <div class="card">
     <div class="card-title">Delivery History</div>
-
     <div class="table-wrapper">
       <table>
         <thead>
@@ -106,24 +102,67 @@
           </tr>
         </thead>
         <tbody id="historyBody">
-          <tr>
-            <td colspan="6" class="text-center text-muted"
-                style="padding:2rem;">Loading...</td>
-          </tr>
+          <tr><td colspan="6" class="text-center text-muted" style="padding:2rem;">Loading...</td></tr>
         </tbody>
       </table>
     </div>
   </div>
-
 </div>
 
 <script src="/static/script.js"></script>
 <script>
+let suppliersData = [];
 
-// ── Set today's date as default ───────────────────────────
 document.getElementById('deliveryDate').valueAsDate = new Date();
 
-// ── Live cost preview ─────────────────────────────────────
+// Load suppliers into dropdown
+async function loadSupplierDropdown() {
+  const suppliers = await get('/api/suppliers');
+  suppliersData   = suppliers;
+  const select    = document.getElementById('supplierSelect');
+
+  suppliers.forEach(s => {
+    const opt   = document.createElement('option');
+    opt.value   = s.name;
+    opt.dataset.price = s.price_per_litre || 0;
+    opt.dataset.minOrder = s.min_order_litres || 0;
+    opt.textContent = `${s.name} — ₹${s.price_per_litre}/L (Min: ${s.min_order_litres}L)`;
+    select.appendChild(opt);
+  });
+}
+
+// Auto-fill when supplier selected
+function onSupplierSelect() {
+  const select   = document.getElementById('supplierSelect');
+  const selected = select.options[select.selectedIndex];
+  const banner   = document.getElementById('autoFillBanner');
+  const text     = document.getElementById('autoFillText');
+
+  if (!selected.value) {
+    banner.style.display = 'none';
+    document.getElementById('litres').value = '';
+    document.getElementById('costPerLitre').value = '';
+    updateCostPreview();
+    return;
+  }
+
+  const price    = parseFloat(selected.dataset.price) || 0;
+  const minOrder = parseFloat(selected.dataset.minOrder) || 0;
+
+  // ← FIXED: always update both fields when supplier changes
+  if (price > 0) {
+    document.getElementById('costPerLitre').value = price;
+  }
+  if (minOrder > 0) {
+    document.getElementById('litres').value = minOrder;  // ← removed the "if empty" check
+  }
+
+  text.textContent = `Auto-filled from ${selected.value}: ₹${price}/litre, minimum order ${minOrder}L. You can edit these values.`;
+  banner.style.display = 'flex';
+  updateCostPreview();
+}
+
+// Live cost preview
 function updateCostPreview() {
   const litres = parseFloat(document.getElementById('litres').value);
   const cost   = parseFloat(document.getElementById('costPerLitre').value);
@@ -132,23 +171,21 @@ function updateCostPreview() {
 
   if (litres > 0 && cost > 0) {
     const total = (litres * cost).toFixed(2);
-    text.textContent    = `Total cost for this delivery: ₹${total}`;
+    text.innerHTML = `Total cost for this delivery: <strong style="font-size:1.1rem;">₹${total}</strong>
+                      &nbsp;(${litres}L × ₹${cost}/L)`;
     preview.style.display = 'flex';
+    preview.style.background = '#D4EDDA';
+    preview.style.color = '#155724';
   } else {
     preview.style.display = 'none';
   }
 }
-
-document.getElementById('litres').addEventListener('input', updateCostPreview);
-document.getElementById('costPerLitre').addEventListener('input', updateCostPreview);
-
-// ── Submit form ───────────────────────────────────────────
+// Submit
 document.getElementById('tankerForm').addEventListener('submit', async function(e) {
   e.preventDefault();
-
-  const btn      = document.getElementById('submitBtn');
-  const errorDiv = document.getElementById('errorMsg');
-  const errorTxt = document.getElementById('errorText');
+  const btn        = document.getElementById('submitBtn');
+  const errorDiv   = document.getElementById('errorMsg');
+  const errorTxt   = document.getElementById('errorText');
   const successDiv = document.getElementById('successMsg');
 
   errorDiv.style.display   = 'none';
@@ -156,11 +193,13 @@ document.getElementById('tankerForm').addEventListener('submit', async function(
   btn.textContent          = 'Saving...';
   btn.disabled             = true;
 
+  const supplierName = document.getElementById('supplierSelect').value;
+
   const data = await post('/tanker/log', {
     delivery_date  : document.getElementById('deliveryDate').value,
     litres         : parseFloat(document.getElementById('litres').value),
     cost_per_litre : parseFloat(document.getElementById('costPerLitre').value) || 0,
-    supplier_name  : document.getElementById('supplierName').value,
+    supplier_name  : supplierName,
     notes          : document.getElementById('notes').value
   });
 
@@ -168,7 +207,8 @@ document.getElementById('tankerForm').addEventListener('submit', async function(
     successDiv.style.display = 'flex';
     document.getElementById('tankerForm').reset();
     document.getElementById('deliveryDate').valueAsDate = new Date();
-    document.getElementById('costPreview').style.display = 'none';
+    document.getElementById('costPreview').style.display    = 'none';
+    document.getElementById('autoFillBanner').style.display = 'none';
     loadHistory();
     showToast('Delivery logged successfully!', 'success');
   } else {
@@ -180,26 +220,20 @@ document.getElementById('tankerForm').addEventListener('submit', async function(
   btn.disabled    = false;
 });
 
-// ── Reset form ────────────────────────────────────────────
 function resetForm() {
-  document.getElementById('costPreview').style.display  = 'none';
-  document.getElementById('successMsg').style.display   = 'none';
-  document.getElementById('errorMsg').style.display     = 'none';
-  document.getElementById('deliveryDate').valueAsDate   = new Date();
+  document.getElementById('costPreview').style.display    = 'none';
+  document.getElementById('successMsg').style.display     = 'none';
+  document.getElementById('errorMsg').style.display       = 'none';
+  document.getElementById('autoFillBanner').style.display = 'none';
+  document.getElementById('deliveryDate').valueAsDate     = new Date();
 }
 
-// ── Load delivery history ─────────────────────────────────
 async function loadHistory() {
   const logs = await get('/tanker/history');
   const body = document.getElementById('historyBody');
 
   if (!logs.length) {
-    body.innerHTML = `
-      <tr>
-        <td colspan="6" class="text-center text-muted" style="padding:2rem;">
-          No deliveries logged yet.
-        </td>
-      </tr>`;
+    body.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:2rem;">No deliveries logged yet.</td></tr>';
     return;
   }
 
@@ -215,22 +249,19 @@ async function loadHistory() {
   `).join('');
 }
 
-// ── Logout ────────────────────────────────────────────────
 async function logout() {
   await post('/logout');
   localStorage.removeItem('swg_user');
   window.location.href = '/login';
 }
 
-// ── Init ──────────────────────────────────────────────────
 async function init() {
   const user = await requireLogin();
   if (!user) return;
+  await loadSupplierDropdown();
   loadHistory();
 }
-
 init();
 </script>
-
 </body>
 </html>

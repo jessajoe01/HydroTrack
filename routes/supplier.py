@@ -4,7 +4,7 @@ from models import Supplier
 
 supplier_bp = Blueprint('supplier', __name__)
 
-@supplier_bp.route('/suppliers', methods=['GET'])
+@supplier_bp.route('/api/suppliers', methods=['GET'])
 @login_required
 def get_suppliers():
     suppliers = Supplier.query.filter_by(is_available=1).all()

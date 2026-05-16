@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suppliers — Smart Water Guardian</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <style>
+    #supplierMap {
+      width: 100%;
+      height: 450px;
+      border-radius: 12px;
+      margin-top: 1rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      border: 2px solid var(--border);
+    }
+    .supplier-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      border-left: 4px solid var(--primary-mid);
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .supplier-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+    .supplier-card.selected {
+      border-left-color: var(--success);
+      background: #f0fff4;
+    }
+    .route-info {
+      background: linear-gradient(135deg, #1F4E79, #2E75B6);
+      border-radius: 12px;
+      padding: 1.2rem 1.5rem;
+      color: white;
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .route-stat { text-align: center; }
+    .route-stat-value { font-size: 1.6rem; font-weight: 800; }
+    .route-stat-label { font-size: 0.78rem; opacity: 0.8; margin-top: 0.2rem; }
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      display: inline-block;
+      animation: pulse 1.5s infinite;
+      margin-right: 4px;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">💧 <span>Smart</span> Water Guardian</a>
+  <ul class="navbar-nav">
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/tanker-log">Log Tanker</a></li>
+    <li><a href="/alerts">Alerts</a></li>
+    <li><a href="/cost">Cost</a></li>
+    <li><a href="/supplier">Suppliers</a></li>
+    <li><a href="/special-request">Special Request</a></li>
+    <li><a href="#" onclick="logout()" style="color:#ff8080;">Logout</a></li>
+  </ul>
+</nav>
+
+<div class="page-wrapper">
+  <h1 class="page-title">📞 Suppliers</h1>
+
+  <!-- GPS Button -->
+  <div class="card" style="margin-bottom:1rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+      <div>
+        <strong>📍 Your Location</strong>
+        <p class="text-muted" style="margin-top:0.2rem;" id="locationStatus">
+          Click to get your location for route planning
+        </p>
+      </div>
+      <button class="btn btn-primary" onclick="getLocation()" id="gpsBtn">
+        📍 Get My Location
+      </button>
+    </div>
+  </div>
+
+  <!-- Supplier Cards -->
+  <div id="supplierGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem;margin-bottom:1.5rem;">
+    <div class="text-center text-muted" style="padding:2rem;">Loading suppliers...</div>
+  </div>
+
+  <!-- Map Card -->
+  <div class="card">
+    <div class="card-title">
+      🗺️ Route to Supplier
+      <span style="font-size:0.78rem;font-weight:400;color:var(--text-muted);margin-left:0.5rem;">
+        <span class="live-dot"></span>Live routing via OpenStreetMap
+      </span>
+    </div>
+
+    <div id="noSelection" class="text-center text-muted" style="padding:2rem;">
+      Select a supplier above to see the route from your location.
+    </div>
+
+    <div id="routeInfo" style="display:none;">
+      <div class="route-info">
+        <div class="route-stat">
+          <div class="route-stat-value" id="routeDistance">—</div>
+          <div class="route-stat-label">Distance (km)</div>
+        </div>
+        <div class="route-stat">
+          <div class="route-stat-value" id="routeTime">—</div>
+          <div class="route-stat-label">Est. Time (min)</div>
+        </div>
+        <div class="route-stat">
+          <div class="route-stat-value" id="routeSupplier">—</div>
+          <div class="route-stat-label">Selected Supplier</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="supplierMap" style="display:none;"></div>
+  </div>
+
+</div>
+
+<script src="/static/script.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+
+// ── Hardcoded supplier coordinates (Bangalore areas) ──
+const SUPPLIER_COORDS = {
+  'City Water Co':    { lat: 12.9716, lng: 77.5946, area: 'North Zone' },
+  'AquaFresh':        { lat: 12.9352, lng: 77.6245, area: 'South Zone' },
+  'PureFlow Tankers': { lat: 12.9857, lng: 77.6083, area: 'East Zone'  }
+};
+
+// Default Bangalore center
+const DEFAULT_LAT = 12.9716;
+const DEFAULT_LNG = 77.5946;
+
+let userLat = null;
+let userLng = null;
+let map = null;
+let routeLayer = null;
+let userMarker = null;
+let supplierMarker = null;
+let selectedSupplier = null;
+let allSuppliers = [];
+
+// ── Get user GPS location ─────────────────────────────
+function getLocation() {
+  const btn = document.getElementById('gpsBtn');
+  const status = document.getElementById('locationStatus');
+  btn.textContent = '⏳ Getting location...';
+  btn.disabled = true;
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      status.textContent = `✅ Location found: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+      btn.textContent = '✅ Location Updated';
+      btn.disabled = false;
+
+      if (userMarker && map) {
+        userMarker.setLatLng([userLat, userLng]);
+      }
+
+      if (selectedSupplier) {
+        drawRoute(selectedSupplier);
+      }
+    },
+    err => {
+      status.textContent = '⚠️ Could not get location. Using default Bangalore location.';
+      userLat = DEFAULT_LAT;
+      userLng = DEFAULT_LNG;
+      btn.textContent = '📍 Retry Location';
+      btn.disabled = false;
+    }
+  );
+}
+
+// ── Load suppliers from backend ───────────────────────
+async function loadSuppliers() {
+  const suppliers = await get('/api/suppliers');
+  const grid = document.getElementById('supplierGrid');
+  allSuppliers = suppliers;
+
+  if (!suppliers.length) {
+    grid.innerHTML = `
+      <div class="card" style="text-align:center;padding:3rem;grid-column:1/-1;">
+        <div style="font-size:3rem;">📭</div>
+        <h3 style="color:var(--text-muted);">No Suppliers Found</h3>
+        <p class="text-muted">No suppliers are currently available.</p>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = suppliers.map((s, i) => {
+    const coords = SUPPLIER_COORDS[s.name] || {
+      lat: DEFAULT_LAT + (i * 0.02),
+      lng: DEFAULT_LNG + (i * 0.02)
+    };
+    return `
+      <div class="supplier-card" id="card-${i}" onclick="selectSupplier(${i})">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:0.8rem;">
+          <div style="font-size:1rem;font-weight:700;color:var(--primary);">🏢 ${s.name}</div>
+          <span class="badge badge-success">Available</span>
+        </div>
+        <table style="width:100%;font-size:0.88rem;">
+          <tr>
+            <td class="text-muted" style="padding:0.25rem 0;">📍 Area</td>
+            <td><strong>${s.area || '—'}</strong></td>
+          </tr>
+          <tr>
+            <td class="text-muted" style="padding:0.25rem 0;">💰 Price/Litre</td>
+            <td><strong>₹${s.price_per_litre || '—'}</strong></td>
+          </tr>
+          <tr>
+            <td class="text-muted" style="padding:0.25rem 0;">🪣 Min Order</td>
+            <td><strong>${s.min_order_litres || '—'} L</strong></td>
+          </tr>
+          <tr>
+            <td class="text-muted" style="padding:0.25rem 0;">🚚 Delivery</td>
+            <td><strong>${s.avg_delivery_days || '—'} day(s)</strong></td>
+          </tr>
+          <tr>
+            <td class="text-muted" style="padding:0.25rem 0;">📱 Contact</td>
+            <td><strong>${s.contact || '—'}</strong></td>
+          </tr>
+        </table>
+        <div style="margin-top:1rem;display:flex;gap:0.5rem;">
+          <a href="tel:${s.contact}" class="btn btn-success" style="flex:1;justify-content:center;">
+            📞 Call
+          </a>
+          <button class="btn btn-primary" style="flex:1;" onclick="event.stopPropagation();selectSupplier(${i})">
+            🗺️ Route
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Select supplier and show route ────────────────────
+function selectSupplier(index) {
+  // Highlight selected card
+  document.querySelectorAll('.supplier-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById(`card-${index}`).classList.add('selected');
+
+  const s = allSuppliers[index];
+  selectedSupplier = s;
+
+  const coords = SUPPLIER_COORDS[s.name] || {
+    lat: DEFAULT_LAT + (index * 0.02),
+    lng: DEFAULT_LNG + (index * 0.02)
+  };
+  selectedSupplier._coords = coords;
+
+  // Show map
+  document.getElementById('noSelection').style.display = 'none';
+  document.getElementById('supplierMap').style.display = 'block';
+  document.getElementById('routeInfo').style.display = 'block';
+  document.getElementById('routeSupplier').textContent = s.name;
+
+  // Use default location if GPS not available
+  if (!userLat) {
+    userLat = DEFAULT_LAT;
+    userLng = DEFAULT_LNG;
+    document.getElementById('locationStatus').textContent =
+      '⚠️ Using default location. Click "Get My Location" for accurate routing.';
+  }
+
+  drawRoute(s);
+}
+
+// ── Initialize or update map ──────────────────────────
+function initMap(userLat, userLng, supplierLat, supplierLng, supplierName) {
+  if (map) {
+    map.remove();
+    map = null;
+  }
+
+  map = L.map('supplierMap').setView([userLat, userLng], 12);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  // User marker
+  const userIcon = L.divIcon({
+    html: `<div style="background:#2E75B6;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">📍</div>`,
+    className: '', iconSize: [28, 28], iconAnchor: [14, 14]
+  });
+
+  userMarker = L.marker([userLat, userLng], { icon: userIcon })
+    .addTo(map)
+    .bindPopup('<strong>📍 Your Location</strong>');
+
+  // Supplier marker
+  const supplierIcon = L.divIcon({
+    html: `<div style="background:#28A745;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">🏢</div>`,
+    className: '', iconSize: [28, 28], iconAnchor: [14, 14]
+  });
+
+  supplierMarker = L.marker([supplierLat, supplierLng], { icon: supplierIcon })
+    .addTo(map)
+    .bindPopup(`<strong>🏢 ${supplierName}</strong>`);
+
+  setTimeout(() => {
+    map.invalidateSize();
+    const group = new L.featureGroup([userMarker, supplierMarker]);
+    map.fitBounds(group.getBounds(), { padding: [60, 60] });
+  }, 150);
+}
+
+// ── Draw route using OSRM ─────────────────────────────
+async function drawRoute(supplier) {
+  const coords = supplier._coords || SUPPLIER_COORDS[supplier.name] || {
+    lat: DEFAULT_LAT, lng: DEFAULT_LNG
+  };
+
+  initMap(userLat, userLng, coords.lat, coords.lng, supplier.name);
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${userLng},${userLat};${coords.lng},${coords.lat}?overview=full&geometries=geojson`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (!data.routes || !data.routes.length) {
+      showToast('Could not calculate route', 'warning');
+      return;
+    }
+
+    const route = data.routes[0];
+
+    // Draw route line
+    if (routeLayer) map.removeLayer(routeLayer);
+    routeLayer = L.geoJSON(route.geometry, {
+      style: { color: '#2E75B6', weight: 5, opacity: 0.8 }
+    }).addTo(map);
+
+    // Fit bounds to route
+    map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
+
+    // Update route stats
+    const distKm = (route.distance / 1000).toFixed(1);
+    const timMin = Math.ceil(route.duration / 60);
+    document.getElementById('routeDistance').textContent = distKm + ' km';
+    document.getElementById('routeTime').textContent     = timMin + ' min';
+
+  } catch (err) {
+    showToast('Route calculation failed. Check internet connection.', 'warning');
+    document.getElementById('routeDistance').textContent = '—';
+    document.getElementById('routeTime').textContent     = '—';
+  }
+}
+
+// ── Logout ────────────────────────────────────────────
+async function logout() {
+  await post('/logout');
+  localStorage.removeItem('swg_user');
+  window.location.href = '/login';
+}
+
+// ── Init ──────────────────────────────────────────────
+async function init() {
+  const user = await requireLogin();
+  if (!user) return;
+  loadSuppliers();
+}
+
+init();
+</script>
+</body>
+</html>

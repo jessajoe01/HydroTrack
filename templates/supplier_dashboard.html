@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supplier Dashboard — Smart Water Guardian</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <style>
+    .tab-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      padding: 0.5rem 1.2rem;
+      border-radius: 8px;
+      border: 2px solid var(--primary-mid);
+      background: transparent;
+      color: var(--primary-mid);
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--primary-mid);
+      color: white;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .status-badge {
+      padding: 0.2rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .status-Pending          { background:#FFF3CD; color:#856404; }
+    .status-Confirmed        { background:#D4EDDA; color:#155724; }
+    .status-Out-for-Delivery { background:#D6E4F0; color:#1F4E79; }
+    .status-Delivered        { background:#D4EDDA; color:#155724; }
+    .status-Partial          { background:#FFF3CD; color:#856404; }
+    #routeMap {
+      width: 100%;
+      height: 400px;
+      border-radius: 12px;
+      margin-top: 1rem;
+      border: 2px solid var(--border);
+    }
+    #deliveryRouteMap {
+      width: 100%;
+      height: 400px;
+      border-radius: 12px;
+      margin-top: 1rem;
+      border: 2px solid var(--border);
+    }
+    .route-info {
+      background: linear-gradient(135deg, #1F4E79, #2E75B6);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      color: white;
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .route-stat { text-align: center; }
+    .route-stat-value { font-size: 1.4rem; font-weight: 800; }
+    .route-stat-label { font-size: 0.78rem; opacity: 0.8; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/supplier-portal" class="navbar-brand">🏢 <span>Supplier</span> Portal</a>
+  <ul class="navbar-nav">
+    <li><span id="agentName" style="color:rgba(255,255,255,0.85);font-size:0.9rem;"></span></li>
+    <li><a href="#" onclick="doLogout()" style="color:#ff8080;">Logout</a></li>
+  </ul>
+</nav>
+
+<div class="page-wrapper">
+
+  <div class="flex-between mb-2">
+    <h1 class="page-title" style="margin-bottom:0;">
+      👋 Welcome, <span id="welcomeName">...</span>
+    </h1>
+    <span class="text-muted" id="companyName"></span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-value" id="statUsers">—</div>
+      <div class="stat-label">Total Users</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-value warning" id="statPending">—</div>
+      <div class="stat-label">Pending Deliveries</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statOutForDelivery">—</div>
+      <div class="stat-label">Out for Delivery</div>
+    </div>
+    <div class="stat-card safe">
+      <div class="stat-value safe" id="statDelivered">—</div>
+      <div class="stat-label">Delivered</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('users', this)">👥 My Users</button>
+    <button class="tab-btn" onclick="showTab('deliveries', this)">🚛 Delivery Orders</button>
+    <button class="tab-btn" onclick="showTab('special', this)">📋 Special Requests</button>
+    <button class="tab-btn" onclick="showTab('map', this)">🗺️ Route Map</button>
+  </div>
+
+  <!-- Tab 1: Users -->
+  <div class="tab-content active" id="tab-users">
+    <div class="card">
+      <div class="card-title">👥 Registered Users</div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Address</th>
+              <th>Family Size</th>
+              <th>Total Orders</th>
+              <th>Last Delivery</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody">
+            <tr><td colspan="6" class="text-center text-muted" style="padding:2rem;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 2: Deliveries -->
+  <div class="tab-content" id="tab-deliveries">
+    <div class="card">
+      <div class="card-title">🚛 Delivery Orders</div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Address</th>
+              <th>Date</th>
+              <th>Litres</th>
+              <th>Total Cost</th>
+              <th>Status</th>
+              <th>Update</th>
+              <th>Route</th>
+            </tr>
+          </thead>
+          <tbody id="deliveriesBody">
+            <tr><td colspan="8" class="text-center text-muted" style="padding:2rem;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Delivery Route Map -->
+    <div class="card" id="deliveryRouteCard" style="display:none;">
+      <div class="card-title">🗺️ Route to User</div>
+      <div id="deliveryRouteInfo" class="route-info" style="display:none;">
+        <div class="route-stat">
+          <div class="route-stat-value" id="deliveryDistance">—</div>
+          <div class="route-stat-label">Distance (km)</div>
+        </div>
+        <div class="route-stat">
+          <div class="route-stat-value" id="deliveryTime">—</div>
+          <div class="route-stat-label">Est. Time (min)</div>
+        </div>
+        <div class="route-stat">
+          <div class="route-stat-value" id="deliveryUser">—</div>
+          <div class="route-stat-label">Delivering To</div>
+        </div>
+      </div>
+      <div id="deliveryRouteMap"></div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Special Requests -->
+  <div class="tab-content" id="tab-special">
+    <div class="card">
+      <div class="card-title">📋 Special Requests</div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Address</th>
+              <th>Title</th>
+              <th>Period</th>
+              <th>Extra Litres/Day</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Respond</th>
+            </tr>
+          </thead>
+          <tbody id="specialBody">
+            <tr><td colspan="8" class="text-center text-muted" style="padding:2rem;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" id="specialRouteCard" style="display:none;">
+    <div class="card-title">🗺️ Route to User</div>
+    <div id="specialRouteInfo" class="route-info" style="display:none;">
+      <div class="route-stat">
+        <div class="route-stat-value" id="specialDistance">—</div>
+        <div class="route-stat-label">Distance (km)</div>
+      </div>
+      <div class="route-stat">
+        <div class="route-stat-value" id="specialTime">—</div>
+        <div class="route-stat-label">Est. Time (min)</div>
+      </div>
+      <div class="route-stat">
+        <div class="route-stat-value" id="specialUser">—</div>
+        <div class="route-stat-label">Routing To</div>
+      </div>
+    </div>
+    <div id="specialRouteMap" style="width:100%;height:400px;border-radius:12px;margin-top:1rem;border:2px solid var(--border);"></div>
+  </div> 
+  </div>
+
+  <!-- Tab 4: Route Map -->
+  <div class="tab-content" id="tab-map">
+    <div class="card">
+      <div class="card-title">🗺️ All Pending Deliveries Map</div>
+      <p class="text-muted">Showing all pending delivery locations from your base.</p>
+      <div id="routeMap"></div>
+    </div>
+  </div>
+
+  <!-- Respond Modal -->
+  <div id="respondModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+    <div class="card" style="max-width:450px;width:90%;margin:0 auto;">
+      <div class="card-title">📋 Respond to Special Request</div>
+      <p id="modalRequestTitle" class="text-muted"></p>
+
+      <div class="form-group">
+        <label>Response Type</label>
+        <select id="responseType" onchange="togglePartial()">
+          <option value="Confirmed">✅ Confirmed — Full quantity available</option>
+          <option value="Partial">📝 Partial — Limited quantity available</option>
+        </select>
+      </div>
+
+      <div id="partialFields" style="display:none;">
+        <div class="form-group">
+          <label>Available Litres</label>
+          <input type="number" id="availableLitres" placeholder="How many litres can you provide?">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Message to User (optional)</label>
+        <textarea id="responseMessage" rows="2" placeholder="Any additional info for the user..."></textarea>
+      </div>
+
+      <div style="display:flex;gap:1rem;margin-top:1rem;">
+        <button class="btn btn-primary" style="flex:1;" onclick="submitResponse()">Submit Response</button>
+        <button class="btn btn-outline" style="flex:1;" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="/static/script.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+
+let agentData        = null;
+let currentRequestId = null;
+let routeMap         = null;
+let deliveryMap      = null;
+let deliveryRouteLayer = null;
+
+// ── Auth check ────────────────────────────────────────
+async function checkAuth() {
+  const res  = await fetch('/supplier-agent/me', { credentials: 'include' });
+  const data = await res.json();
+  if (data.error) {
+    window.location.href = '/supplier-portal';
+    return null;
+  }
+  agentData = data;
+  document.getElementById('welcomeName').textContent = data.name;
+  document.getElementById('agentName').textContent   = data.name;
+  document.getElementById('companyName').textContent = data.company_name;
+  return data;
+}
+
+// ── Tab switching ─────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+
+  if (name === 'users')      loadUsers();
+  if (name === 'deliveries') loadDeliveries();
+  if (name === 'special')    loadSpecialRequests();
+  if (name === 'map')        loadRouteMap();
+}
+
+// ── Load users ────────────────────────────────────────
+async function loadUsers() {
+  const res   = await fetch('/supplier-agent/users', { credentials: 'include' });
+  const users = await res.json();
+  const body  = document.getElementById('usersBody');
+  document.getElementById('statUsers').textContent = users.length;
+
+  if (!users.length) {
+    body.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:2rem;">No users yet.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = users.map(u => `
+    <tr>
+      <td><strong>${u.name}</strong></td>
+      <td>${u.email}</td>
+      <td>${u.address || '—'}</td>
+      <td>${u.family_size}</td>
+      <td>${u.total_orders}</td>
+      <td>${formatDate(u.last_delivery)}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Load deliveries ───────────────────────────────────
+async function loadDeliveries() {
+  const res        = await fetch('/supplier-agent/deliveries', { credentials: 'include' });
+  const deliveries = await res.json();
+  const body       = document.getElementById('deliveriesBody');
+
+  const pending   = deliveries.filter(d => d.status === 'Pending').length;
+  const outFor    = deliveries.filter(d => d.status === 'Out for Delivery').length;
+  const delivered = deliveries.filter(d => d.status === 'Delivered').length;
+
+  document.getElementById('statPending').textContent        = pending;
+  document.getElementById('statOutForDelivery').textContent = outFor;
+  document.getElementById('statDelivered').textContent      = delivered;
+
+  if (!deliveries.length) {
+    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted" style="padding:2rem;">No deliveries yet.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = deliveries.map(d => `
+    <tr>
+      <td><strong>${d.user_name}</strong></td>
+      <td>${d.user_address || '—'}</td>
+      <td>${formatDate(d.delivery_date)}</td>
+      <td>${d.litres} L</td>
+      <td>₹${d.total_cost || '—'}</td>
+      <td><span class="status-badge status-${d.status.replace(/ /g,'-')}">${d.status}</span></td>
+      <td>
+        <select onchange="updateStatus(${d.id}, this.value)"
+          style="padding:0.2rem;border-radius:6px;border:1px solid var(--border);font-size:0.82rem;">
+          <option ${d.status==='Pending'?'selected':''}>Pending</option>
+          <option ${d.status==='Confirmed'?'selected':''}>Confirmed</option>
+          <option ${d.status==='Out for Delivery'?'selected':''}>Out for Delivery</option>
+          <option ${d.status==='Delivered'?'selected':''}>Delivered</option>
+        </select>
+      </td>
+      <td>
+        <button class="btn btn-primary"
+          style="padding:0.2rem 0.6rem;font-size:0.78rem;"
+          onclick="showDeliveryRoute(${d.user_lat || 12.9716}, ${d.user_lng || 77.5946}, '${d.user_name}', '${d.user_address || ''}')">
+          🗺️
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ── Show route to specific delivery ──────────────────
+async function showDeliveryRoute(userLat, userLng, userName, userAddress) {
+  const agentLat = agentData?.lat || 12.9716;
+  const agentLng = agentData?.lng || 77.5946;
+
+  document.getElementById('deliveryRouteCard').style.display = 'block';
+  document.getElementById('deliveryUser').textContent        = userName;
+  document.getElementById('deliveryRouteInfo').style.display = 'flex';
+
+  // Scroll to map
+  document.getElementById('deliveryRouteCard').scrollIntoView({ behavior: 'smooth' });
+
+  if (deliveryMap) { deliveryMap.remove(); deliveryMap = null; }
+
+  deliveryMap = L.map('deliveryRouteMap').setView([agentLat, agentLng], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(deliveryMap);
+
+  // Agent marker
+  const agentIcon = L.divIcon({
+    html: `<div style="background:#1F4E79;width:30px;height:30px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">🏢</div>`,
+    className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+  });
+
+  L.marker([agentLat, agentLng], { icon: agentIcon })
+    .addTo(deliveryMap)
+    .bindPopup(`<strong>🏢 ${agentData?.company_name}</strong><br>Your Base`);
+
+  // User marker
+  const userIcon = L.divIcon({
+    html: `<div style="background:#28A745;width:30px;height:30px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">🏠</div>`,
+    className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+  });
+
+  L.marker([userLat, userLng], { icon: userIcon })
+    .addTo(deliveryMap)
+    .bindPopup(`<strong>🏠 ${userName}</strong><br>${userAddress}`);
+
+  setTimeout(() => deliveryMap.invalidateSize(), 150);
+
+  // Draw route using OSRM
+  try {
+    const url  = `https://router.project-osrm.org/route/v1/driving/${agentLng},${agentLat};${userLng},${userLat}?overview=full&geometries=geojson`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (!data.routes || !data.routes.length) return;
+
+    const route = data.routes[0];
+
+    if (deliveryRouteLayer) deliveryMap.removeLayer(deliveryRouteLayer);
+    deliveryRouteLayer = L.geoJSON(route.geometry, {
+      style: { color: '#2E75B6', weight: 5, opacity: 0.8 }
+    }).addTo(deliveryMap);
+
+    deliveryMap.fitBounds(deliveryRouteLayer.getBounds(), { padding: [60, 60] });
+
+    const distKm = (route.distance / 1000).toFixed(1);
+    const timMin = Math.ceil(route.duration / 60);
+    document.getElementById('deliveryDistance').textContent = distKm + ' km';
+    document.getElementById('deliveryTime').textContent     = timMin + ' min';
+
+  } catch (err) {
+    showToast('Route calculation failed', 'warning');
+  }
+}
+
+// ── Update delivery status ────────────────────────────
+async function updateStatus(id, status) {
+  const res  = await fetch(`/supplier-agent/deliveries/${id}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ status })
+  });
+  const data = await res.json();
+  if (data.status === 'success') {
+    showToast(`Status updated to ${status}`, 'success');
+    loadDeliveries();
+  }
+}
+// ── Dedicated route map for Special Requests tab ──────
+let specialMap = null;
+let specialRouteLayer = null;
+
+async function showSpecialRoute(userLat, userLng, userName, userAddress) {
+  const agentLat = agentData?.lat || 12.9716;
+  const agentLng = agentData?.lng || 77.5946;
+
+  document.getElementById('specialRouteCard').style.display = 'block';
+  document.getElementById('specialRouteInfo').style.display = 'flex';
+  document.getElementById('specialUser').textContent = userName;
+
+  document.getElementById('specialRouteCard').scrollIntoView({ behavior: 'smooth' });
+
+  if (specialMap) { specialMap.remove(); specialMap = null; }
+
+  specialMap = L.map('specialRouteMap', {
+    dragging: true,
+    scrollWheelZoom: true
+  }).setView([agentLat, agentLng], 12);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(specialMap);
+
+  const agentIcon = L.divIcon({
+    html: `<div style="background:#1F4E79;width:30px;height:30px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">🏢</div>`,
+    className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+  });
+  L.marker([agentLat, agentLng], { icon: agentIcon })
+    .addTo(specialMap)
+    .bindPopup(`<strong>🏢 ${agentData?.company_name}</strong><br>Your Base`);
+
+  const userIcon = L.divIcon({
+    html: `<div style="background:#28A745;width:30px;height:30px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">🏠</div>`,
+    className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+  });
+  L.marker([userLat, userLng], { icon: userIcon })
+    .addTo(specialMap)
+    .bindPopup(`<strong>🏠 ${userName}</strong><br>${userAddress}`);
+
+  setTimeout(() => specialMap.invalidateSize(), 300);
+
+  try {
+    const url  = `https://router.project-osrm.org/route/v1/driving/${agentLng},${agentLat};${userLng},${userLat}?overview=full&geometries=geojson`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (!data.routes?.length) return;
+
+    const route = data.routes[0];
+
+    if (specialRouteLayer) specialMap.removeLayer(specialRouteLayer);
+    specialRouteLayer = L.geoJSON(route.geometry, {
+      style: { color: '#2E75B6', weight: 5, opacity: 0.8 }
+    }).addTo(specialMap);
+
+    specialMap.fitBounds(specialRouteLayer.getBounds(), { padding: [60, 60] });
+
+    document.getElementById('specialDistance').textContent =
+      (route.distance / 1000).toFixed(1) + ' km';
+    document.getElementById('specialTime').textContent =
+      Math.ceil(route.duration / 60) + ' min';
+
+  } catch (err) {
+    showToast('Route calculation failed', 'warning');
+  }
+}
+// ── Load special requests ─────────────────────────────
+async function loadSpecialRequests() {
+  const res      = await fetch('/supplier-agent/special-requests', { credentials: 'include' });
+  const requests = await res.json();
+  const body     = document.getElementById('specialBody');
+
+  if (!requests.length) {
+    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted" style="padding:2rem;">No special requests yet.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = requests.map(r => `
+    <tr>
+      <td><strong>${r.user_name}</strong></td>
+      <td>${r.user_address || '—'}</td>
+      <td>${r.title}</td>
+      <td>${formatDate(r.start_date)} → ${formatDate(r.end_date)}</td>
+      <td>${r.extra_litres_per_day} L</td>
+      <td>${r.total_extra_litres} L</td>
+      <td><span class="status-badge status-${r.status}">${r.status}</span></td>
+      <td style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+        ${r.status === 'Pending' ? `
+          <button class="btn btn-primary"
+            style="padding:0.2rem 0.6rem;font-size:0.78rem;"
+            onclick="openModal(${r.id}, '${r.title}')">
+            Respond
+          </button>` : '—'}
+        <button class="btn btn-outline"
+          style="padding:0.2rem 0.6rem;font-size:0.78rem;"
+          onclick="showSpecialRoute(${r.user_lat || 12.9716}, ${r.user_lng || 77.5946}, '${r.user_name}', '${r.user_address || ''}')">
+          🗺️
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ── Modal ─────────────────────────────────────────────
+function openModal(id, title) {
+  currentRequestId = id;
+  document.getElementById('modalRequestTitle').textContent = title;
+  document.getElementById('respondModal').style.display   = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('respondModal').style.display = 'none';
+  currentRequestId = null;
+}
+
+function togglePartial() {
+  const type = document.getElementById('responseType').value;
+  document.getElementById('partialFields').style.display = type === 'Partial' ? 'block' : 'none';
+}
+
+async function submitResponse() {
+  const res = await fetch(`/supplier-agent/special-requests/${currentRequestId}/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      response_type    : document.getElementById('responseType').value,
+      available_litres : parseFloat(document.getElementById('availableLitres').value) || null,
+      message          : document.getElementById('responseMessage').value
+    })
+  });
+  const data = await res.json();
+  if (data.status === 'success') {
+    showToast('Response submitted!', 'success');
+    closeModal();
+    loadSpecialRequests();
+  }
+}
+
+// ── All Pending Route Map ─────────────────────────────
+async function loadRouteMap() {
+  if (routeMap) { routeMap.remove(); routeMap = null; }
+
+  const agentLat = agentData?.lat || 12.9716;
+  const agentLng = agentData?.lng || 77.5946;
+
+ routeMap = L.map('routeMap', {
+    dragging: true,       // ← explicitly enable drag
+    scrollWheelZoom: true
+  }).setView([agentLat, agentLng], 12);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(routeMap);
+
+  // Agent base marker
+  const agentIcon = L.divIcon({
+    html: `<div style="background:#1F4E79;width:34px;height:34px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-size:16px;">🏢</div>`,
+    className: '', iconSize: [34, 34], iconAnchor: [17, 17]
+  });
+
+  L.marker([agentLat, agentLng], { icon: agentIcon })
+    .addTo(routeMap)
+    .bindPopup(`<strong>🏢 ${agentData?.company_name || 'Your Base'}</strong><br>Supplier Base`);
+
+  const res        = await fetch('/supplier-agent/deliveries', { credentials: 'include' });
+  const deliveries = await res.json();
+
+  // Status color and emoji map
+  const statusConfig = {
+    'Pending':           { color: '#FFC107', emoji: '⏳', label: 'Pending' },
+    'Confirmed':         { color: '#2E75B6', emoji: '✅', label: 'Confirmed' },
+    'Out for Delivery':  { color: '#FF6B35', emoji: '🚛', label: 'Out for Delivery' },
+    'Delivered':         { color: '#28A745', emoji: '✔️', label: 'Delivered' }
+  };
+
+  deliveries.forEach((d, i) => {
+    const cfg = statusConfig[d.status] || statusConfig['Pending'];
+    const lat = d.user_lat;
+    const lng = d.user_lng;
+
+    const icon = L.divIcon({
+      html: `<div style="background:${cfg.color};width:30px;height:30px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;">${cfg.emoji}</div>`,
+      className: '', iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+
+    L.marker([lat, lng], { icon })
+      .addTo(routeMap)
+      .bindPopup(`
+        <strong>🏠 ${d.user_name}</strong><br>
+        ${d.user_address || ''}<br>
+        ${d.litres}L<br>
+        <span style="background:${cfg.color};color:white;padding:2px 8px;border-radius:10px;font-size:0.78rem;">${cfg.label}</span>
+      `);
+  });
+
+  // Legend
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function() {
+    const div = L.DomUtil.create('div');
+    div.style.cssText = 'background:white;padding:8px 12px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.2);font-size:12px;';
+    div.innerHTML = `
+      <strong style="display:block;margin-bottom:4px;">Legend</strong>
+      <div>🏢 Supplier Base</div>
+      <div>⏳ Pending</div>
+      <div>✅ Confirmed</div>
+      <div>🚛 Out for Delivery</div>
+      <div>✔️ Delivered</div>
+    `;
+    return div;
+  };
+  legend.addTo(routeMap);
+
+  setTimeout(() => routeMap.invalidateSize(), 300);
+}
+
+// ── Logout ────────────────────────────────────────────
+async function doLogout() {
+  await fetch('/supplier-agent/logout', { method: 'POST', credentials: 'include' });
+  localStorage.removeItem('supplier_agent');
+  window.location.href = '/supplier-portal';
+}
+
+// ── Format date ───────────────────────────────────────
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric'
+  });
+}
+
+// ── Init ──────────────────────────────────────────────
+async function init() {
+  const agent = await checkAuth();
+  if (!agent) return;
+  loadUsers();
+}
+
+init();
+</script>
+
+</body>
+</html>

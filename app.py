@@ -37,6 +37,7 @@ from routes.alerts import alerts_bp
 from routes.cost import cost_bp
 from routes.supplier import supplier_bp
 from routes.special_request import special_request_bp
+from routes.supplier_agent import supplier_agent_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
@@ -45,6 +46,7 @@ app.register_blueprint(alerts_bp)
 app.register_blueprint(cost_bp)
 app.register_blueprint(supplier_bp)
 app.register_blueprint(special_request_bp)
+app.register_blueprint(supplier_agent_bp)
 from flask_login import current_user
 
 @app.route('/me')
@@ -107,6 +109,15 @@ def supplier_page():
 @login_required
 def special_request_page():
     return render_template('special_request.html')
+
+# ── Supplier Agent Portal ──────────────────────────────
+@app.route('/supplier-portal')
+def supplier_portal_page():
+    return render_template('login.html')
+
+@app.route('/supplier-portal/dashboard')
+def supplier_dashboard_page():
+    return render_template('supplier_dashboard.html')
 
 
 # ── Debug/Test route (optional) ────────────────────────

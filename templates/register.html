@@ -60,9 +60,36 @@
         </div>
       </div>
 
+      <!-- Location section -->
+      <div class="card" style="margin-bottom:1rem;padding:1rem;background:#f0f7ff;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+          <div>
+            <strong>📍 Your Location</strong>
+            <p class="text-muted" style="margin-top:0.2rem;font-size:0.82rem;" id="locationStatus">
+              Click to detect your location for route planning
+            </p>
+          </div>
+          <button type="button" class="btn btn-primary" onclick="getLocation()" id="gpsBtn">
+            📍 Detect Location
+          </button>
+        </div>
+        <div class="form-row" style="margin-top:0.8rem;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:0.82rem;">Latitude</label>
+            <input type="number" id="lat" placeholder="Auto-detected" step="any" readonly
+              style="background:#f8f9fa;font-size:0.85rem;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size:0.82rem;">Longitude</label>
+            <input type="number" id="lng" placeholder="Auto-detected" step="any" readonly
+              style="background:#f8f9fa;font-size:0.85rem;">
+          </div>
+        </div>
+      </div>
+
       <div class="alert-banner info mt-1 mb-1" style="font-size:0.82rem;">
         <span class="alert-icon">💡</span>
-        <span>Family size helps us estimate your daily water usage automatically.</span>
+        <span>Family size helps estimate daily usage. Location enables route planning with suppliers.</span>
       </div>
 
       <button type="submit" class="btn btn-primary btn-full btn-lg mt-2" id="registerBtn">
@@ -80,53 +107,82 @@
 
 <script src="/static/script.js"></script>
 <script>
-  document.getElementById('registerForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
+let userLat = 12.9716;
+let userLng = 77.5946;
 
-    const btn        = document.getElementById('registerBtn');
-    const errorDiv   = document.getElementById('errorMsg');
-    const errorTxt   = document.getElementById('errorText');
-    const successDiv = document.getElementById('successMsg');
+function getLocation() {
+  const btn    = document.getElementById('gpsBtn');
+  const status = document.getElementById('locationStatus');
 
-    const password        = document.getElementById('password').value;
-    const confirmPassword = document.getElementById('confirmPassword').value;
+  btn.textContent = '⏳ Detecting...';
+  btn.disabled    = true;
 
-    // Client side validation
-    if (password.length < 6) {
-      errorTxt.textContent   = 'Password must be at least 6 characters.';
-      errorDiv.style.display = 'flex';
-      return;
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      document.getElementById('lat').value = userLat.toFixed(6);
+      document.getElementById('lng').value = userLng.toFixed(6);
+      status.textContent = `✅ Location detected: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+      btn.textContent    = '✅ Location Detected';
+      btn.disabled       = false;
+    },
+    err => {
+      status.textContent = '⚠️ Could not detect location. Default Bangalore location will be used.';
+      btn.textContent    = '📍 Retry Location';
+      btn.disabled       = false;
     }
+  );
+}
 
-    if (password !== confirmPassword) {
-      errorTxt.textContent   = 'Passwords do not match.';
-      errorDiv.style.display = 'flex';
-      return;
-    }
+document.getElementById('registerForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
 
-    errorDiv.style.display = 'none';
-    btn.textContent        = 'Creating account...';
-    btn.disabled           = true;
+  const btn        = document.getElementById('registerBtn');
+  const errorDiv   = document.getElementById('errorMsg');
+  const errorTxt   = document.getElementById('errorText');
+  const successDiv = document.getElementById('successMsg');
 
-    const data = await post('/register', {
-      name:        document.getElementById('name').value,
-      email:       document.getElementById('email').value,
-      password:    password,
-      family_size: parseInt(document.getElementById('familySize').value),
-      address:     document.getElementById('address').value
-    });
+  const password        = document.getElementById('password').value;
+  const confirmPassword = document.getElementById('confirmPassword').value;
 
-    if (data.status === 'success') {
-      successDiv.style.display = 'flex';
-      errorDiv.style.display   = 'none';
-      setTimeout(() => window.location.href = '/login', 1800);
-    } else {
-      errorTxt.textContent   = data.error || 'Registration failed. Please try again.';
-      errorDiv.style.display = 'flex';
-      btn.textContent        = 'Create Account';
-      btn.disabled           = false;
-    }
+  if (password.length < 6) {
+    errorTxt.textContent   = 'Password must be at least 6 characters.';
+    errorDiv.style.display = 'flex';
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    errorTxt.textContent   = 'Passwords do not match.';
+    errorDiv.style.display = 'flex';
+    return;
+  }
+
+  errorDiv.style.display = 'none';
+  btn.textContent        = 'Creating account...';
+  btn.disabled           = true;
+
+  const data = await post('/register', {
+    name:        document.getElementById('name').value,
+    email:       document.getElementById('email').value,
+    password:    password,
+    family_size: parseInt(document.getElementById('familySize').value),
+    address:     document.getElementById('address').value,
+    lat:         userLat,
+    lng:         userLng
   });
+
+  if (data.status === 'success') {
+    successDiv.style.display = 'flex';
+    errorDiv.style.display   = 'none';
+    setTimeout(() => window.location.href = '/login', 1800);
+  } else {
+    errorTxt.textContent   = data.error || 'Registration failed. Please try again.';
+    errorDiv.style.display = 'flex';
+    btn.textContent        = 'Create Account';
+    btn.disabled           = false;
+  }
+});
 </script>
 
 </body>

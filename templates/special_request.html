@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Special Request — Smart Water Guardian</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <a href="/dashboard" class="navbar-brand">💧 <span>Smart</span> Water Guardian</a>
+  <ul class="navbar-nav">
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/tanker-log">Log Tanker</a></li>
+    <li><a href="/alerts">Alerts</a></li>
+    <li><a href="/cost">Cost</a></li>
+    <li><a href="/supplier">Suppliers</a></li>
+    <li><a href="/special-request">Special Request</a></li>
+    <li><a href="#" onclick="logout()" style="color:#ff8080;">Logout</a></li>
+  </ul>
+</nav>
+
+<div class="page-wrapper">
+  <h1 class="page-title">📋 Special Water Request</h1>
+
+  <div class="card">
+    <div class="card-title">Submit New Request</div>
+
+    <div id="successMsg" class="alert-banner success" style="display:none;">
+      <span class="alert-icon">✅</span>
+      <span id="successText"></span>
+    </div>
+    <div id="errorMsg" class="alert-banner danger" style="display:none;">
+      <span class="alert-icon">⚠️</span>
+      <span id="errorText"></span>
+    </div>
+
+    <form id="requestForm">
+      <div class="form-group">
+        <label>Request Title</label>
+        <input type="text" id="title" placeholder="e.g. Diwali guests, Construction work" required>
+      </div>
+
+      <div class="form-group">
+        <label>Reason</label>
+        <select id="reason">
+          <option value="Guests/Event">Guests / Event</option>
+          <option value="Construction">Construction Work</option>
+          <option value="Summer Storage">Summer Storage</option>
+          <option value="Medical Need">Medical Need</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="startDate" required>
+        </div>
+        <div class="form-group">
+          <label>End Date</label>
+          <input type="date" id="endDate" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Number of Extra People</label>
+        <input type="number" id="extraPeople" placeholder="e.g. 5" min="1" required>
+      </div>
+
+      <div id="preview" class="alert-banner info" style="display:none;">
+        <span class="alert-icon">💡</span>
+        <span id="previewText"></span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg mt-2" id="submitBtn">
+        📋 Submit Request
+      </button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-title">My Requests</div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Reason</th>
+            <th>Period</th>
+            <th>Extra Litres/Day</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="requestBody">
+          <tr>
+            <td colspan="7" class="text-center text-muted" style="padding:2rem;">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/static/script.js"></script>
+<script>
+
+function updatePreview() {
+  const people = parseInt(document.getElementById('extraPeople').value);
+  const start  = document.getElementById('startDate').value;
+  const end    = document.getElementById('endDate').value;
+  const preview = document.getElementById('preview');
+
+  if (people > 0 && start && end) {
+    const days  = Math.floor((new Date(end) - new Date(start)) / 86400000) + 1;
+    const extra = people * 50;
+    const total = extra * days;
+    document.getElementById('previewText').textContent =
+      `${people} extra people × 50L/day × ${days} days = ${total}L total extra water needed`;
+    preview.style.display = 'flex';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+document.getElementById('extraPeople').addEventListener('input', updatePreview);
+document.getElementById('startDate').addEventListener('change', updatePreview);
+document.getElementById('endDate').addEventListener('change', updatePreview);
+
+document.getElementById('requestForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = 'Submitting...';
+  btn.disabled = true;
+
+  const data = await post('/special-request/create', {
+    title:        document.getElementById('title').value,
+    reason:       document.getElementById('reason').value,
+    start_date:   document.getElementById('startDate').value,
+    end_date:     document.getElementById('endDate').value,
+    extra_people: parseInt(document.getElementById('extraPeople').value)
+  });
+
+  if (data.status === 'success') {
+    const summary = data.summary;
+    document.getElementById('successText').textContent =
+      `Request submitted! ${summary.calculation}`;
+    document.getElementById('successMsg').style.display = 'flex';
+    document.getElementById('errorMsg').style.display   = 'none';
+    document.getElementById('requestForm').reset();
+    document.getElementById('preview').style.display = 'none';
+    loadRequests();
+  } else {
+    document.getElementById('errorText').textContent = data.error || 'Failed to submit.';
+    document.getElementById('errorMsg').style.display = 'flex';
+  }
+
+  btn.textContent = '📋 Submit Request';
+  btn.disabled = false;
+});
+
+async function loadRequests() {
+  const data = await get('/special-request/list');
+  const body = document.getElementById('requestBody');
+  const requests = data.requests || data;
+
+  if (!requests.length) {
+    body.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:2rem;">No requests yet.</td></tr>';
+    return;
+  }
+
+  const badgeMap = {
+    'Pending':   'badge-warning',
+    'Active':    'badge-info',
+    'Completed': 'badge-success',
+    'Cancelled': 'badge-gray'
+  };
+
+  body.innerHTML = requests.map(r => `
+    <tr>
+      <td><strong>${r.title}</strong></td>
+      <td>${r.reason}</td>
+      <td>${formatDate(r.start_date)} → ${formatDate(r.end_date)}</td>
+      <td>${r.extra_litres_per_day} L</td>
+      <td>${r.total_extra_litres} L</td>
+      <td><span class="badge ${badgeMap[r.status] || 'badge-info'}">${r.status}</span></td>
+      <td>${r.status === 'Pending'
+        ? `<button class="btn btn-danger" style="padding:0.2rem 0.6rem;font-size:0.8rem;" onclick="cancelRequest(${r.id})">Cancel</button>`
+        : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+async function cancelRequest(id) {
+  const data = await put(`/special-request/${id}/cancel`);
+  if (data.status === 'success') {
+    showToast('Request cancelled', 'success');
+    loadRequests();
+  }
+}
+
+async function logout() {
+  await post('/logout');
+  localStorage.removeItem('swg_user');
+  window.location.href = '/login';
+}
+
+async function init() {
+  const user = await requireLogin();
+  if (!user) return;
+  loadRequests();
+}
+init();
+</script>
+</body>
+</html>
