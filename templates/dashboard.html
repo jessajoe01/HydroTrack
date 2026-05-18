@@ -130,6 +130,7 @@
       <a href="/supplier" class="btn btn-success">📞 Find Supplier</a>
       <a href="/special-request" class="btn btn-outline">📋 Special Request</a>
       <a href="/cost" class="btn btn-outline">💰 View Cost Summary</a>
+      <button class="btn btn-outline" onclick="updateLocation()">📍 Update My Location</button>
     </div>
   </div>
 
@@ -366,7 +367,37 @@ async function loadUsageGraph() {
     }
   });
 }
+// ── Update GPS location ───────────────────────────────────
+async function updateLocation() {
+  const btn = event.target;
+  btn.textContent = '⏳ Detecting...';
+  btn.disabled = true;
 
+  navigator.geolocation.getCurrentPosition(
+    async pos => {
+      const data = await post('/update-location', {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      });
+      if (data.status === 'success') {
+        showToast('Location updated successfully!', 'success');
+        btn.textContent = '✅ Location Updated';
+      } else {
+        showToast('Failed to update location', 'danger');
+        btn.textContent = '📍 Update My Location';
+      }
+      btn.disabled = false;
+    },
+    err => {
+      showToast('Could not detect location', 'danger');
+      btn.textContent = '📍 Update My Location';
+      btn.disabled = false;
+    }
+  );
+}
+
+// ── Init ──────────────────────────────────────────────────
+loadDashboard();
 // ── Init ──────────────────────────────────────────────────
 loadDashboard();
 </script>

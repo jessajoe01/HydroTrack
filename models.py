@@ -60,6 +60,8 @@ class Supplier(db.Model):
     min_order_litres    = db.Column(db.Float)
     avg_delivery_days   = db.Column(db.Integer)
     is_available        = db.Column(db.Integer, default=1)
+    lat= db.Column(db.Float, default=12.9716)  # ← is this there?
+    lng= db.Column(db.Float, default=77.5946)
 
 
 class SpecialRequest(db.Model):

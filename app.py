@@ -53,11 +53,15 @@ from flask_login import current_user
 def get_current_user():
     if not current_user.is_authenticated:
         return jsonify({'error': 'Not logged in'}), 401
-
     return jsonify({
-        'id': current_user.id,
-        'email': current_user.email
-    })
+        'user_id'    : current_user.id,
+        'name'       : current_user.name,
+        'email'      : current_user.email,
+        'address'    : current_user.address,
+        'family_size': current_user.family_size,
+        'lat'        : current_user.lat,
+        'lng'        : current_user.lng
+    }), 200
 
 # ── Page routes (HTML) ─────────────────────────────────
 @app.route('/')

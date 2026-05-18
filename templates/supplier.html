@@ -137,12 +137,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 
-// ── Hardcoded supplier coordinates (Bangalore areas) ──
-const SUPPLIER_COORDS = {
-  'City Water Co':    { lat: 12.9716, lng: 77.5946, area: 'North Zone' },
-  'AquaFresh':        { lat: 12.9352, lng: 77.6245, area: 'South Zone' },
-  'PureFlow Tankers': { lat: 12.9857, lng: 77.6083, area: 'East Zone'  }
-};
 
 // Default Bangalore center
 const DEFAULT_LAT = 12.9716;
@@ -158,34 +152,54 @@ let selectedSupplier = null;
 let allSuppliers = [];
 
 // ── Get user GPS location ─────────────────────────────
-function getLocation() {
-  const btn = document.getElementById('gpsBtn');
+async function getLocation() {
+  const btn    = document.getElementById('gpsBtn');
   const status = document.getElementById('locationStatus');
   btn.textContent = '⏳ Getting location...';
   btn.disabled = true;
 
   navigator.geolocation.getCurrentPosition(
-    pos => {
+    async pos => {
       userLat = pos.coords.latitude;
       userLng = pos.coords.longitude;
-      status.textContent = `✅ Location found: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
-      btn.textContent = '✅ Location Updated';
-      btn.disabled = false;
+
+      // reverse geocode
+      let detectedAddress = `${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+      try {
+        const res  = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${userLat}&lon=${userLng}&format=json`
+        );
+        const data = await res.json();
+        const parts = [
+          data.address.neighbourhood,
+          data.address.suburb,
+          data.address.city || data.address.town
+        ].filter(Boolean);
+        detectedAddress = parts.join(', ');
+      } catch (e) {}
+
+      // save to DB
+      await post('/update-location', {
+        lat    : userLat,
+        lng    : userLng,
+        address: detectedAddress
+      });
+
+      status.textContent = `✅ Location updated: ${detectedAddress}`;
+      btn.textContent    = '✅ Location Updated';
+      btn.disabled       = false;
 
       if (userMarker && map) {
         userMarker.setLatLng([userLat, userLng]);
       }
-
       if (selectedSupplier) {
         drawRoute(selectedSupplier);
       }
     },
     err => {
-      status.textContent = '⚠️ Could not get location. Using default Bangalore location.';
-      userLat = DEFAULT_LAT;
-      userLng = DEFAULT_LNG;
-      btn.textContent = '📍 Retry Location';
-      btn.disabled = false;
+      status.textContent = '⚠️ Could not get location. Please try again.';
+      btn.textContent    = '📍 Retry Location';
+      btn.disabled       = false;
     }
   );
 }
@@ -207,10 +221,6 @@ async function loadSuppliers() {
   }
 
   grid.innerHTML = suppliers.map((s, i) => {
-    const coords = SUPPLIER_COORDS[s.name] || {
-      lat: DEFAULT_LAT + (i * 0.02),
-      lng: DEFAULT_LNG + (i * 0.02)
-    };
     return `
       <div class="supplier-card" id="card-${i}" onclick="selectSupplier(${i})">
         <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:0.8rem;">
@@ -261,11 +271,10 @@ function selectSupplier(index) {
   const s = allSuppliers[index];
   selectedSupplier = s;
 
-  const coords = SUPPLIER_COORDS[s.name] || {
-    lat: DEFAULT_LAT + (index * 0.02),
-    lng: DEFAULT_LNG + (index * 0.02)
-  };
-  selectedSupplier._coords = coords;
+  selectedSupplier._coords = {
+    lat: s.lat || DEFAULT_LAT,
+    lng: s.lng || DEFAULT_LNG
+};
 
   // Show map
   document.getElementById('noSelection').style.display = 'none';
@@ -327,9 +336,7 @@ function initMap(userLat, userLng, supplierLat, supplierLng, supplierName) {
 
 // ── Draw route using OSRM ─────────────────────────────
 async function drawRoute(supplier) {
-  const coords = supplier._coords || SUPPLIER_COORDS[supplier.name] || {
-    lat: DEFAULT_LAT, lng: DEFAULT_LNG
-  };
+  const coords = supplier._coords || { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
 
   initMap(userLat, userLng, coords.lat, coords.lng, supplier.name);
 
@@ -373,11 +380,20 @@ async function logout() {
   localStorage.removeItem('swg_user');
   window.location.href = '/login';
 }
-
+async function loadUserLocation() {
+  const data = await get('/me');
+  if (data.lat && data.lng) {
+    userLat = data.lat;
+    userLng = data.lng;
+    document.getElementById('locationStatus').textContent =
+      `✅ Using your saved location: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+  }
+}
 // ── Init ──────────────────────────────────────────────
 async function init() {
   const user = await requireLogin();
   if (!user) return;
+  await loadUserLocation(); 
   loadSuppliers();
 }
 

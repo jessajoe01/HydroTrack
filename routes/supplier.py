@@ -15,5 +15,7 @@ def get_suppliers():
         'area'              : s.area,
         'price_per_litre'   : s.price_per_litre,
         'min_order_litres'  : s.min_order_litres,
-        'avg_delivery_days' : s.avg_delivery_days
+        'avg_delivery_days' : s.avg_delivery_days,
+        'lat'               : s.lat,   # ← is this there?
+        'lng'               : s.lng
     } for s in suppliers]), 200

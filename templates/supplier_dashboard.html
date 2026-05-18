@@ -235,8 +235,8 @@
   <!-- Tab 4: Route Map -->
   <div class="tab-content" id="tab-map">
     <div class="card">
-      <div class="card-title">🗺️ All Pending Deliveries Map</div>
-      <p class="text-muted">Showing all pending delivery locations from your base.</p>
+    <div class="card-title">🗺️ Recent Deliveries Map</div>
+    <p class="text-muted">Showing most recent delivery per user from your base.</p>
       <div id="routeMap"></div>
     </div>
   </div>
@@ -377,7 +377,7 @@ async function loadDeliveries() {
       <td>
         <button class="btn btn-primary"
           style="padding:0.2rem 0.6rem;font-size:0.78rem;"
-          onclick="showDeliveryRoute(${d.user_lat || 12.9716}, ${d.user_lng || 77.5946}, '${d.user_name}', '${d.user_address || ''}')">
+          onclick="showDeliveryRoute(${d.user_lat ?? 12.9716}, ${d.user_lng ?? 77.5946}, '${d.user_name}', '${d.user_address || ''}')">
           🗺️
         </button>
       </td>
@@ -636,7 +636,15 @@ async function loadRouteMap() {
 
   const res        = await fetch('/supplier-agent/deliveries', { credentials: 'include' });
   const deliveries = await res.json();
-
+  const seen = {};
+  const filtered = deliveries.filter(d => {
+  const key = `${d.user_name}-${d.status}`;
+  if (!seen[key]) {
+    seen[key] = true;
+    return true;
+  }
+  return false;
+});
   // Status color and emoji map
   const statusConfig = {
     'Pending':           { color: '#FFC107', emoji: '⏳', label: 'Pending' },
@@ -645,11 +653,19 @@ async function loadRouteMap() {
     'Delivered':         { color: '#28A745', emoji: '✔️', label: 'Delivered' }
   };
 
-  deliveries.forEach((d, i) => {
-    const cfg = statusConfig[d.status] || statusConfig['Pending'];
-    const lat = d.user_lat;
-    const lng = d.user_lng;
-
+filtered.forEach((d, i) => {
+  const cfg = statusConfig[d.status] || statusConfig['Pending'];
+  // Fixed small offsets so overlapping markers spread neatly
+  const offsets = [
+    [0, 0],
+    [0.0008, 0],
+    [-0.0008, 0],
+    [0, 0.0008],
+    [0, -0.0008]
+  ];
+  const offset = offsets[i % offsets.length];
+  const lat = (d.user_lat || 12.9716) + offset[0];
+  const lng = (d.user_lng || 77.5946) + offset[1];
     const icon = L.divIcon({
       html: `<div style="background:${cfg.color};width:30px;height:30px;border-radius:50%;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;">${cfg.emoji}</div>`,
       className: '', iconSize: [30, 30], iconAnchor: [15, 15]

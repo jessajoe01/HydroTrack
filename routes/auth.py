@@ -87,5 +87,17 @@ def me():
         'name': current_user.name,
         'email': current_user.email,
         'address': current_user.address,
-        'family_size': current_user.family_size
+        'family_size': current_user.family_size,
+        'lat'        : current_user.lat,    # ← ADD
+        'lng'        : current_user.lng   
     }), 200
+@auth_bp.route('/update-location', methods=['POST'])
+@login_required
+def update_location():
+    data = request.get_json()
+    current_user.lat     = data.get('lat')
+    current_user.lng     = data.get('lng')
+    if data.get('address'):
+        current_user.address = data.get('address')
+    db.session.commit()
+    return jsonify({'status': 'success'}), 200
